@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f4f7fb" />
+    <title>后台管理登录 · 车辆调度控制台</title>
+    <link rel="stylesheet" href="/styles.css?v=20260916-guideline-fixes-1" />
+    <link rel="stylesheet" href="/valueco-day.css?v=20260915-vehicle-compliance-1" />
+    <link rel="stylesheet" href="/valueco-refined.css?v=20260915-feihong-console-static-route-1" />
+  </head>
+  <body class="auth-page">
+    <main class="auth-shell">
+      <section class="auth-intro auth-brand-panel">
+        <div class="auth-brand-top"><span class="auth-brand-mark">VC</span><span class="auth-brand-label">VALUECO / FLEET OPS</span></div>
+        <div class="auth-intro-content">
+          <p class="eyebrow">VALUECO · ADMINISTRATION</p>
+          <h1>车辆调度后台管理</h1>
+          <p>在一个清晰的运营后台管理车辆总览、调度任务和账号权限，让车队状态始终可见。</p>
+          <div class="auth-brand-signal">
+            <div><strong>FLEET</strong><span>车辆总览</span></div>
+            <div><strong>OPS</strong><span>任务调度</span></div>
+            <div><strong>ROLE</strong><span>权限管理</span></div>
+          </div>
+          <div class="auth-permission-list">
+            <span>桌面调度</span><span>车辆管理</span><span>账号权限</span>
+          </div>
+        </div>
+        <div class="auth-brand-footer"><span class="auth-brand-dot"></span><span>VALUECO OPERATIONS SYSTEM</span></div>
+      </section>
+      <section class="auth-card" aria-labelledby="adminLoginTitle">
+        <div class="auth-card-heading">
+          <div><p class="eyebrow">ADMIN ACCESS</p><h2 id="adminLoginTitle">后台管理登录</h2></div>
+          <div class="auth-card-actions"><button id="adminLanguageToggle" class="language-toggle" type="button" aria-label="切换中英文">English</button><button id="adminThemeToggle" class="theme-toggle" type="button">自动模式</button></div>
+        </div>
+        <p id="adminLoginError" class="auth-message" role="alert"></p>
+        <form id="adminLoginForm" class="auth-form">
+          <label><span>管理员账号</span><input id="adminUsername" name="username" type="text" autocomplete="username" required placeholder="输入管理员账号" /></label>
+          <label><span>密码</span><input id="adminPassword" name="password" type="password" autocomplete="current-password" required placeholder="输入密码" /></label>
+          <button class="button button-primary button-wide" type="submit">登录后台管理</button>
+          <a class="button button-quiet button-wide" href="/login">返回移动调度登录</a>
+        </form>
+        <p class="auth-note">请使用由系统管理员分配的管理员账号。Lark 账号和普通独立账号不能进入后台管理。</p>
+      </section>
+    </main>
+    <script src="/theme.js?v=20260916-guideline-fixes-1"></script>
+    <script src="/admin-login.js?v=20260913-auth-hierarchy-1" defer></script>
+  </body>
+</html>

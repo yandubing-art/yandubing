@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+data/
+*.zip
+release-artifacts/
+prototypes/
+PROJECT_HANDOFF.md
+auth-*.png
+drive-*.png

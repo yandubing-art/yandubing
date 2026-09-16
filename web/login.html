@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f4f7fb" />
+    <title>登录 · 车辆调度控制台</title>
+    <link rel="stylesheet" href="/styles.css?v=20260916-guideline-fixes-1" />
+    <link rel="stylesheet" href="/valueco-day.css?v=20260915-vehicle-compliance-1" />
+    <link rel="stylesheet" href="/valueco-refined.css?v=20260915-feihong-console-static-route-1" />
+  </head>
+  <body class="auth-page">
+    <main class="auth-shell">
+      <section class="auth-intro auth-brand-panel">
+        <div class="auth-brand-top"><span class="auth-brand-mark">VC</span><span class="auth-brand-label">VALUECO / FLEET OPS</span></div>
+        <div class="auth-intro-content">
+          <p class="eyebrow">VALUECO · LARK OPERATIONS</p>
+          <h1>车辆调度控制台</h1>
+          <p>让每一次出发都清晰可追踪。统一连接公司人员、车辆与调度任务，默认进入移动设备调度。</p>
+          <div class="auth-brand-signal">
+            <div><strong>01</strong><span>统一车队</span></div>
+            <div><strong>24·7</strong><span>随时调度</span></div>
+            <div><strong>LARK</strong><span>协同工作台</span></div>
+          </div>
+          <div class="auth-permission-list">
+            <span>移动调度</span><span>桌面调度</span><span>车辆管理</span><span>账号权限</span>
+          </div>
+        </div>
+        <div class="auth-brand-footer"><span class="auth-brand-dot"></span><span>VALUECO OPERATIONS SYSTEM</span></div>
+      </section>
+      <section class="auth-card" aria-labelledby="loginTitle">
+        <div class="auth-card-heading">
+          <div><p class="eyebrow">SECURE SIGN IN</p><h2 id="loginTitle">登录调度系统</h2></div>
+          <div class="auth-card-actions"><button id="loginLanguageToggle" class="language-toggle" type="button" aria-label="切换中英文">English</button><button id="loginThemeToggle" class="theme-toggle" type="button">自动模式</button></div>
+        </div>
+        <p id="loginError" class="auth-message" role="alert"></p>
+        <a id="larkLogin" class="button button-primary auth-lark-button" href="/api/auth/lark/start">使用 Lark 账号登录</a>
+        <p id="larkLoginHint" class="auth-login-hint" hidden>使用公司 Lark 账号安全登录，成功后进入移动设备调度。</p>
+        <div id="loginDivider" class="auth-divider" hidden><span>其他登录方式</span></div>
+        <details id="localLoginOption" class="auth-secondary-option">
+          <summary>使用独立账号登录</summary>
+          <form id="localLoginForm" class="auth-form">
+            <label><span data-i18n="账号">账号</span><input id="username" name="username" type="text" autocomplete="username" required placeholder="输入账号" /></label>
+            <label><span data-i18n="密码">密码</span><input id="password" name="password" type="password" autocomplete="current-password" required placeholder="输入密码" /></label>
+            <button class="button button-primary button-wide" type="submit">登录并进入移动调度</button>
+          </form>
+        </details>
+        <div class="auth-link-row"><a class="button button-quiet button-wide" href="/?view=booking">预约车辆</a><a class="button button-quiet button-wide" href="/admin-login">后台管理登录</a></div>
+        <details id="previewTools" class="auth-preview-tools" hidden>
+          <summary>预览测试入口</summary>
+          <p>仅用于本地体验，不适用于正式上线。</p>
+          <button id="previewLoginButton" class="button button-quiet button-wide" type="button">使用预览管理员账号</button>
+        </details>
+        <p class="auth-note">账号由管理员分配角色：调度员、排程员、车队管理员或管理员。</p>
+      </section>
+    </main>
+    <script src="/theme.js?v=20260916-guideline-fixes-1"></script>
+    <script src="/login.js?v=20260913-auth-hierarchy-1" defer></script>
+  </body>
+</html>

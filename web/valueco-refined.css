@@ -1,0 +1,251 @@
+/* Feihong console system: neutral operational surfaces, royal blue structure,
+   gold highlights and burgundy reserved for consequential states. */
+html[data-theme="day"] {
+  --vc-refined-bg:#EEF3F5;
+  --vc-refined-surface:#FFFFFF;
+  --vc-refined-soft:#F7F8FA;
+  --vc-refined-ink:#0D1225;
+  --vc-refined-muted:#6B7288;
+  --vc-refined-line:#D8DCE8;
+  --vc-refined-primary:#0A2463;
+  --vc-refined-primary-deep:#061842;
+  --vc-refined-accent:#D8315B;
+  --vc-refined-gold:#F4D35E;
+  --vc-refined-gold-ink:#8F7018;
+  --vc-refined-success:#2D9B5E;
+  --vc-refined-danger:#D8315B;
+  --ink:var(--vc-refined-ink);
+  --muted:var(--vc-refined-muted);
+  --line:var(--vc-refined-line);
+  --surface:var(--vc-refined-surface);
+  --panel:var(--vc-refined-surface);
+  --panel-soft:var(--vc-refined-soft);
+  --blue:var(--vc-refined-primary);
+  --cyan:#1E4DAA;
+  --gold:var(--vc-refined-gold);
+  --shadow:0 12px 30px rgba(13,18,37,.09);
+}
+
+html[data-theme="night"] {
+  --vc-refined-bg:#0C121C;
+  --vc-refined-surface:#121828;
+  --vc-refined-soft:#161F32;
+  --vc-refined-ink:#F0F4FA;
+  --vc-refined-muted:#AEB8CA;
+  --vc-refined-line:#1E2740;
+  --vc-refined-primary:#7B9DDB;
+  --vc-refined-primary-deep:#F0F4FA;
+  --vc-refined-accent:#ED8BA2;
+  --vc-refined-gold:#F4D35E;
+  --vc-refined-gold-ink:#F4D35E;
+  --vc-refined-success:#77C996;
+  --vc-refined-danger:#ED8BA2;
+  --ink:var(--vc-refined-ink);
+  --muted:var(--vc-refined-muted);
+  --line:var(--vc-refined-line);
+  --surface:var(--vc-refined-surface);
+  --panel:var(--vc-refined-surface);
+  --panel-soft:var(--vc-refined-soft);
+  --blue:var(--vc-refined-primary);
+  --cyan:var(--vc-refined-primary);
+  --gold:var(--vc-refined-gold);
+  --shadow:0 14px 34px rgba(0,0,0,.3);
+}
+
+html[data-theme] body,
+html[data-theme] .auth-page {
+  color:var(--ink);
+  background-color:var(--vc-refined-bg);
+  background-image:
+    linear-gradient(128deg,transparent 0 27%,color-mix(in srgb,var(--blue) 6%,transparent) 27.08% 27.16%,transparent 27.25% 100%),
+    linear-gradient(128deg,transparent 0 68%,color-mix(in srgb,var(--gold) 9%,transparent) 68.08% 68.16%,transparent 68.25% 100%),
+    linear-gradient(90deg,transparent 0 19.9%,color-mix(in srgb,var(--blue) 4%,transparent) 20%,transparent 20.1% 100%),
+    linear-gradient(180deg,color-mix(in srgb,var(--surface) 44%,transparent),transparent 29%,transparent 76%,color-mix(in srgb,var(--blue) 5%,transparent));
+  background-size:100% 100%;
+  background-attachment:fixed;
+}
+html[data-theme] body::before {
+  display:block;
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  opacity:.58;
+  background:
+    linear-gradient(90deg,transparent calc(100% - 92px),color-mix(in srgb,var(--gold) 20%,transparent) calc(100% - 91px),color-mix(in srgb,var(--gold) 20%,transparent) calc(100% - 90px),transparent calc(100% - 89px)),
+    linear-gradient(180deg,color-mix(in srgb,var(--surface) 22%,transparent),transparent 23%,transparent 79%,color-mix(in srgb,var(--blue) 6%,transparent));
+}
+html[data-theme] body::after { display:none !important; }
+html[data-theme] .shell,
+html[data-theme] .auth-shell { position:relative; z-index:1; }
+
+html[data-theme] .topbar,
+html[data-theme] .panel,
+html[data-theme] .stat-card,
+html[data-theme] .auth-card,
+html[data-theme] .vehicle-card,
+html[data-theme] .mobile-action {
+  border-color:var(--line);
+  background:var(--surface);
+  box-shadow:var(--shadow);
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+html[data-theme] .topbar { border-top:3px solid var(--gold); }
+html[data-theme] .panel-heading { background:var(--surface); border-bottom-color:var(--line); }
+html[data-theme] h1 { font-family:Georgia,"Noto Serif SC","Songti SC",serif; letter-spacing:0; }
+html[data-theme] h2,
+html[data-theme] h3 { letter-spacing:0; }
+html[data-theme] h1,
+html[data-theme] h2,
+html[data-theme] h3,
+html[data-theme] .stat-card strong,
+html[data-theme] .vehicle-model,
+html[data-theme] .vehicle-specs strong,
+html[data-theme] .vehicle-maintenance-row strong,
+html[data-theme] .auth-intro-content h1 { color:var(--ink); }
+html[data-theme] .eyebrow { color:var(--vc-refined-accent); }
+html[data-theme] .subtitle,
+html[data-theme] .field-hint,
+html[data-theme] .auth-intro-content > p:not(.eyebrow),
+html[data-theme] .auth-note,
+html[data-theme] .auth-login-hint,
+html[data-theme] .account-status,
+html[data-theme] .vehicle-meta,
+html[data-theme] .task-meta,
+html[data-theme] .driver,
+html[data-theme] .mileage,
+html[data-theme] .stage-label,
+html[data-theme] footer { color:var(--muted); }
+
+html[data-theme] input,
+html[data-theme] select,
+html[data-theme] textarea {
+  color:var(--ink);
+  background:color-mix(in srgb,var(--surface) 88%,var(--vc-refined-bg));
+  border-color:var(--line);
+  box-shadow:none;
+}
+html[data-theme] input::placeholder,
+html[data-theme] textarea::placeholder { color:color-mix(in srgb,var(--muted) 78%,transparent); }
+html[data-theme] input:focus,
+html[data-theme] select:focus,
+html[data-theme] textarea:focus {
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 16%,transparent);
+}
+html[data-theme] select option { color:var(--ink); background:var(--vc-refined-soft); }
+html[data-theme] button:focus-visible,
+html[data-theme] a:focus-visible,
+html[data-theme] input:focus-visible,
+html[data-theme] select:focus-visible,
+html[data-theme] textarea:focus-visible { outline:2px solid var(--gold); outline-offset:3px; }
+
+html[data-theme] .button-primary,
+html[data-theme] .auth-lark-button {
+  color:#fff;
+  background:var(--blue);
+  border-color:var(--blue);
+  box-shadow:0 7px 16px color-mix(in srgb,var(--blue) 24%,transparent);
+}
+html[data-theme] .button-primary:hover,
+html[data-theme] .auth-lark-button:hover { color:#fff; background:var(--vc-refined-primary-deep); border-color:var(--vc-refined-primary-deep); }
+html[data-theme] .button-quiet,
+html[data-theme] .language-toggle,
+html[data-theme] .theme-toggle,
+html[data-theme] .location-button,
+html[data-theme] .vehicle-dispatch,
+html[data-theme] .vehicle-locate,
+html[data-theme] .vehicle-edit {
+  color:var(--ink);
+  background:var(--surface);
+  border-color:var(--line);
+  box-shadow:none;
+}
+html[data-theme] .button-quiet:hover,
+html[data-theme] .language-toggle:hover,
+html[data-theme] .theme-toggle:hover,
+html[data-theme] .location-button:hover,
+html[data-theme] .vehicle-dispatch:hover,
+html[data-theme] .vehicle-locate:hover,
+html[data-theme] .vehicle-edit:hover { color:var(--vc-refined-primary-deep); border-color:var(--blue); background:color-mix(in srgb,var(--blue) 8%,var(--surface)); }
+html[data-theme] .language-toggle { color:var(--vc-refined-primary-deep); background:color-mix(in srgb,var(--blue) 9%,var(--surface)); border-color:color-mix(in srgb,var(--blue) 32%,var(--line)); }
+html[data-theme] .theme-toggle { color:var(--vc-refined-accent); background:color-mix(in srgb,var(--vc-refined-accent) 8%,var(--surface)); border-color:color-mix(in srgb,var(--vc-refined-accent) 30%,var(--line)); }
+
+html[data-theme] th { color:var(--muted); background:var(--panel-soft); }
+html[data-theme] td { color:var(--ink); border-top-color:var(--line); }
+html[data-theme] .task-row:hover > td { background:color-mix(in srgb,var(--blue) 5%,transparent); }
+html[data-theme] .task-row-selected > td { background:color-mix(in srgb,var(--blue) 12%,transparent) !important; }
+html[data-theme] .status-pending,
+html[data-theme] .maintenance-warn { color:var(--vc-refined-gold-ink); background:color-mix(in srgb,var(--gold) 20%,transparent); }
+html[data-theme] .status-running { color:var(--vc-refined-primary-deep); background:color-mix(in srgb,var(--blue) 15%,transparent); }
+html[data-theme] .status-done,
+html[data-theme] .maintenance-ok { color:var(--vc-refined-success); background:color-mix(in srgb,var(--vc-refined-success) 15%,transparent); }
+html[data-theme] .status-failed,
+html[data-theme] .status-cancelled,
+html[data-theme] .maintenance-critical { color:var(--vc-refined-danger); background:color-mix(in srgb,var(--vc-refined-danger) 14%,transparent); }
+
+html[data-theme] .photo-section,
+html[data-theme] .return-section,
+html[data-theme] .transfer-section,
+html[data-theme] .vehicle-detail-section,
+html[data-theme] .history-filters,
+html[data-theme] .task-timeline-pane,
+html[data-theme] .auth-secondary-option,
+html[data-theme] .auth-preview-tools,
+html[data-theme] .notification-department,
+html[data-theme] .vehicle-option-table { background:var(--panel-soft); border-color:var(--line); }
+html[data-theme] .transfer-section { border-top:3px solid var(--gold); }
+html[data-theme] .transfer-task-summary { background:color-mix(in srgb,var(--gold) 8%,var(--surface)); border-color:color-mix(in srgb,var(--gold) 28%,var(--line)); }
+html[data-theme] .vehicle-detail-section,
+html[data-theme] .notification-stage,
+html[data-theme] .vehicle-option-field { background:color-mix(in srgb,var(--surface) 72%,var(--panel-soft)); border-color:var(--line); }
+html[data-theme] .notification-target { color:var(--vc-refined-primary-deep); background:color-mix(in srgb,var(--blue) 12%,transparent); border-color:color-mix(in srgb,var(--blue) 28%,var(--line)); }
+html[data-theme] .vehicle-option-chip { color:var(--vc-refined-primary-deep); background:color-mix(in srgb,var(--blue) 11%,transparent); border-color:color-mix(in srgb,var(--blue) 30%,var(--line)); }
+html[data-theme] .vehicle-option-chip button { color:#fff; background:var(--vc-refined-danger); border-color:var(--vc-refined-danger); }
+
+html[data-theme] .task-inspector-pane,
+html[data-theme] .task-inspector-timeline { background:var(--panel-soft); }
+html[data-theme] .task-inspector-summary,
+html[data-theme] .task-inspector-timeline .timeline-item { background:var(--surface); }
+html[data-theme] .task-inspector-actions .action-link { color:var(--vc-refined-primary-deep); background:var(--surface); border-color:var(--line); }
+html[data-theme] .task-inspector-actions .action-link:hover { background:color-mix(in srgb,var(--blue) 8%,var(--surface)); border-color:var(--blue); }
+
+html[data-theme] .vehicle-card { background:var(--surface); }
+html[data-theme] .vehicle-image { background:linear-gradient(145deg,color-mix(in srgb,var(--blue) 13%,var(--surface-soft)),var(--surface-soft)); }
+html[data-theme] .vehicle-plate { color:var(--vc-refined-accent); }
+html[data-theme] .vehicle-specs span,
+html[data-theme] .vehicle-maintenance-row { background:var(--panel-soft); border-color:var(--line); }
+html[data-theme] .sold-vehicles-panel { color:var(--ink); border-color:color-mix(in srgb,var(--gold) 38%,var(--line)); background:color-mix(in srgb,var(--gold) 7%,var(--surface)); }
+html[data-theme] .sold-vehicles-panel summary { color:var(--ink); }
+html[data-theme] .sold-vehicles-panel summary small { color:var(--vc-refined-gold); background:color-mix(in srgb,var(--gold) 13%,transparent); border-color:color-mix(in srgb,var(--gold) 32%,var(--line)); }
+
+html[data-theme] .auth-page { min-height:100vh; }
+html[data-theme] .auth-intro.auth-brand-panel { border-color:color-mix(in srgb,var(--blue) 28%,var(--line)); background:linear-gradient(145deg,color-mix(in srgb,var(--blue) 14%,var(--surface)),var(--surface)); }
+html[data-theme] .auth-brand-mark { color:#fff; background:var(--vc-refined-accent); box-shadow:3px 3px 0 var(--gold); }
+html[data-theme] .auth-brand-label { color:var(--vc-refined-primary-deep); }
+html[data-theme] .auth-brand-signal div,
+html[data-theme] .auth-permission-list span { color:var(--ink); background:color-mix(in srgb,var(--surface) 84%,var(--panel-soft)); border-color:var(--line); }
+html[data-theme] .auth-brand-dot { background:var(--vc-refined-success); box-shadow:0 0 0 5px color-mix(in srgb,var(--vc-refined-success) 15%,transparent); }
+html[data-theme] .auth-card { border-top:3px solid var(--blue); }
+html[data-theme] .auth-secondary-option summary,
+html[data-theme] .auth-preview-tools summary { color:var(--vc-refined-primary-deep); }
+
+html[data-theme] body.apply-view .topbar { background:transparent; border:0; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
+html[data-theme] .mobile-action { overflow:hidden; position:relative; }
+html[data-theme] .mobile-action::before { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(120deg,color-mix(in srgb,var(--blue) 11%,transparent),transparent 44%); }
+html[data-theme] .mobile-action > * { position:relative; z-index:1; }
+html[data-theme] .departure-action { border-top:3px solid var(--vc-refined-accent); }
+html[data-theme] .transfer-action { border-top:3px solid var(--gold); background:color-mix(in srgb,var(--gold) 7%,var(--surface)); }
+html[data-theme] .return-action { border-top:3px solid var(--vc-refined-success); background:color-mix(in srgb,var(--vc-refined-success) 6%,var(--surface)); }
+html[data-theme] .mobile-action-icon { color:var(--vc-refined-primary-deep); background:color-mix(in srgb,var(--blue) 13%,transparent); border-color:color-mix(in srgb,var(--blue) 22%,transparent); }
+html[data-theme] .departure-action .mobile-action-icon { color:var(--vc-refined-accent); background:color-mix(in srgb,var(--vc-refined-accent) 12%,transparent); }
+html[data-theme] .transfer-action .mobile-action-icon { color:var(--vc-refined-gold-ink); background:color-mix(in srgb,var(--gold) 18%,transparent); }
+html[data-theme] .return-action .mobile-action-icon { color:var(--vc-refined-success); background:color-mix(in srgb,var(--vc-refined-success) 13%,transparent); }
+
+@media (hover:hover) and (pointer:fine) {
+  html[data-theme] .vehicle-card:hover,
+  html[data-theme] .mobile-action:hover { border-color:color-mix(in srgb,var(--blue) 50%,var(--line)); box-shadow:0 16px 34px color-mix(in srgb,var(--blue) 12%,transparent); }
+}
+@media (max-width:650px) { html[data-theme] body { background-attachment:scroll; } }

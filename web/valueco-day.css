@@ -1,0 +1,250 @@
+/* Value Co daylight layer. Loaded after styles.css so the light palette is deterministic. */
+html[data-theme="day"] {
+  --fh-blue:#0A2463;
+  --fh-gold:#F4D35E;
+  --fh-burgundy:#D8315B;
+  --fh-blue-dark:#08194a;
+  --vc-charcoal:#333e48;
+  --vc-ink:#202a33;
+  --vc-muted:#68737d;
+  --vc-line:#d8dee3;
+  --vc-bg:#f3f5f6;
+  --vc-surface:#fff;
+  --vc-soft:#f8fafb;
+  --blue:var(--fh-blue);
+  --cyan:#147ea3;
+  --gold:#725900;
+  --ink:var(--vc-ink);
+  --muted:var(--vc-muted);
+  --line:var(--vc-line);
+  --panel:var(--vc-surface);
+  --panel-soft:var(--vc-soft);
+  --shadow:0 10px 28px rgba(51,62,72,.09);
+}
+html[data-theme="day"] body,
+html[data-theme="day"] .auth-page { color:var(--vc-ink); background:var(--vc-bg); background-image:none; }
+html[data-theme="day"] body { position:relative; isolation:isolate; overflow-x:hidden; background-color:#eef1f0; background-image:linear-gradient(rgba(10,36,99,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(10,36,99,.035) 1px,transparent 1px),linear-gradient(118deg,transparent 0 38%,rgba(216,49,91,.045) 38.1% 38.45%,transparent 38.55% 100%),linear-gradient(118deg,transparent 0 73%,rgba(10,36,99,.04) 73.1% 73.35%,transparent 73.45% 100%); background-size:38px 38px,38px 38px,100% 100%,100% 100%; background-attachment:fixed; }
+html[data-theme="day"] body::before { display:block; content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.7; background:linear-gradient(90deg,transparent calc(100% - 78px),rgba(244,211,94,.14) calc(100% - 77px),rgba(244,211,94,.14) calc(100% - 75px),transparent calc(100% - 74px)),linear-gradient(180deg,rgba(255,255,255,.5),transparent 22%,transparent 78%,rgba(10,36,99,.035)); }
+html[data-theme="day"] body::after { display:none; content:"No. 01"; position:fixed; z-index:0; right:-28px; top:36%; pointer-events:none; color:var(--fh-blue); font-family:Georgia,"Times New Roman",serif; font-size:clamp(74px,10vw,154px); font-weight:700; line-height:1; letter-spacing:.02em; opacity:.055; transform:rotate(90deg); transform-origin:center; }
+html[data-theme="day"] .shell { position:relative; z-index:1; }
+html[data-theme="day"] body:not(.apply-view) main { position:relative; }
+html[data-theme="day"] body:not(.apply-view) main::before { content:""; position:absolute; top:-8px; left:4px; width:clamp(110px,18vw,240px); height:clamp(44px,7vw,86px); border-top:1px solid rgba(10,36,99,.16); border-left:1px solid rgba(216,49,91,.22); pointer-events:none; z-index:-1; }
+html[data-theme="day"] body:has(#overviewView:not([hidden]))::after { display:block; content:"No. 01"; }
+html[data-theme="day"] body:has(#overviewView:not([hidden])) main::after { content:"OPERATIONS / 2026"; position:absolute; right:8px; top:-28px; color:rgba(10,36,99,.28); font-size:9px; font-weight:800; letter-spacing:.2em; pointer-events:none; }
+html[data-theme="day"] body:has(#overviewView:not([hidden])) #overviewView { position:relative; }
+html[data-theme="day"] body:has(#overviewView:not([hidden])) #overviewView::before { content:"FLEET / DISPATCH"; position:absolute; right:clamp(12px,3vw,46px); top:clamp(20px,3vw,44px); z-index:-1; color:rgba(10,36,99,.08); font-family:Georgia,"Times New Roman",serif; font-size:clamp(30px,5vw,72px); font-weight:700; letter-spacing:.02em; white-space:nowrap; pointer-events:none; }
+html[data-theme="day"] body:has(#overviewView:not([hidden])) #overviewView::after { content:""; position:absolute; right:0; bottom:8%; width:42%; height:1px; background:linear-gradient(90deg,transparent,rgba(216,49,91,.26),rgba(244,211,94,.42)); pointer-events:none; z-index:-1; }
+html[data-theme="day"] .mobile-logout-button { display:none; }
+html[data-theme="day"] body.apply-view .mobile-logout-button { display:inline-flex; align-items:center; justify-content:center; min-height:34px; margin-left:auto; padding:8px 11px; border-color:rgba(216,49,91,.35); color:#a51f45; background:#fff5f6; font-size:11px; font-weight:850; }
+html[data-theme="day"] body.apply-view .mobile-logout-button:hover { border-color:var(--fh-burgundy); background:#ffecef; color:#8e1739; }
+
+/* Login canvas: an editorial field of flowing lines keeps the daylight mode
+   expressive while the white authentication card stays easy to read. */
+html[data-theme="day"] body.auth-page { background-color:#edf1f3; background-image:radial-gradient(circle at 18% 14%,rgba(244,211,94,.28),transparent 24rem),radial-gradient(circle at 83% 76%,rgba(216,49,91,.18),transparent 25rem),linear-gradient(132deg,#f7f8f6 0%,#edf2f3 48%,#e8edf3 100%); }
+html[data-theme="day"] body.auth-page::before { display:block; opacity:.78; background-image:repeating-radial-gradient(ellipse 88% 42% at 2% 76%,transparent 0 15px,rgba(10,36,99,.14) 16px 17px,transparent 18px 31px),repeating-radial-gradient(ellipse 74% 44% at 94% 22%,transparent 0 13px,rgba(216,49,91,.12) 14px 15px,transparent 16px 29px),repeating-radial-gradient(ellipse 96% 36% at 73% 88%,transparent 0 19px,rgba(244,211,94,.2) 20px 21px,transparent 22px 40px),linear-gradient(116deg,transparent 0 44%,rgba(216,49,91,.055) 44.2% 44.45%,transparent 44.65% 100%); background-size:760px 520px,680px 500px,900px 440px,100% 100%; background-position:-90px 54%,calc(100% + 90px) -40px,52% calc(100% + 40px),0 0; background-repeat:no-repeat; mask-image:none; -webkit-mask-image:none; }
+html[data-theme="day"] body.auth-page::after { display:block; content:""; position:fixed; inset:8% 5% 9%; z-index:0; border:1px solid rgba(10,36,99,.12); border-radius:42% 58% 36% 64% / 52% 38% 62% 48%; transform:rotate(-7deg) skewX(-4deg); box-shadow:0 0 0 12px rgba(216,49,91,.035),0 0 0 24px rgba(244,211,94,.055),0 0 0 38px rgba(10,36,99,.028); pointer-events:none; }
+html[data-theme="day"] body.auth-page .auth-shell { position:relative; z-index:1; }
+html[data-theme="day"] .shell { padding-top:12px; padding-bottom:22px; }
+html[data-theme="day"] .topbar { border:1px solid rgba(216,222,227,.92); border-top:3px solid var(--fh-gold); border-radius:8px; background:rgba(255,255,255,.8); box-shadow:0 8px 22px rgba(51,62,72,.08); backdrop-filter:blur(14px) saturate(120%); -webkit-backdrop-filter:blur(14px) saturate(120%); }
+html[data-theme="day"] .brand-lockup { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+html[data-theme="day"] .brand-mark,
+html[data-theme="day"] .auth-brand-mark { display:grid; place-items:center; width:38px; height:38px; border-radius:5px; background:var(--fh-burgundy); color:#fff; font-size:13px; font-weight:950; letter-spacing:-.08em; box-shadow:3px 3px 0 var(--fh-gold); }
+html[data-theme="day"] .brand-copy { display:grid; gap:2px; }
+html[data-theme="day"] .brand-copy strong { color:var(--vc-charcoal); font-size:14px; letter-spacing:.08em; }
+html[data-theme="day"] .brand-copy small { color:var(--vc-muted); font-size:8px; font-weight:800; letter-spacing:.08em; }
+html[data-theme="day"] .eyebrow { color:var(--fh-burgundy); letter-spacing:.13em; }
+html[data-theme="day"] h1 { color:var(--vc-charcoal); text-shadow:none; }
+html[data-theme="day"] .subtitle,
+html[data-theme="day"] .field-hint { color:var(--vc-muted); }
+html[data-theme="day"] .button-primary { background:var(--fh-blue); color:#fff; box-shadow:0 6px 14px rgba(10,36,99,.2); }
+html[data-theme="day"] .button-primary:hover { background:var(--fh-blue-dark); }
+html[data-theme="day"] .button-quiet { background:#fff; color:var(--vc-charcoal); border:1px solid #ccd4da; }
+html[data-theme="day"] .button-quiet:hover { background:#f7f9fa; border-color:var(--fh-burgundy); color:#a51f45; }
+html[data-theme="day"] .language-toggle { border-radius:5px; border-color:var(--fh-gold); background:#fffbe0; color:#725900; box-shadow:none; }
+html[data-theme="day"] .theme-toggle { border-radius:5px; border-color:#c7d0d6; background:#f7f9fa; color:var(--vc-charcoal); }
+html[data-theme="day"] input,
+html[data-theme="day"] select,
+html[data-theme="day"] textarea { border-color:#cbd4da; background:#fff; color:var(--vc-ink); border-radius:5px; box-shadow:none; }
+html[data-theme="day"] input:focus,
+html[data-theme="day"] select:focus,
+html[data-theme="day"] textarea:focus { border-color:var(--fh-blue); box-shadow:0 0 0 3px rgba(10,36,99,.14); }
+html[data-theme="day"] .panel,
+html[data-theme="day"] .stat-card,
+html[data-theme="day"] .mobile-action,
+html[data-theme="day"] .auth-card { background:rgba(255,255,255,.82); border-color:rgba(216,222,227,.92); border-radius:8px; box-shadow:var(--shadow); backdrop-filter:blur(12px) saturate(118%); -webkit-backdrop-filter:blur(12px) saturate(118%); }
+html[data-theme="day"] .panel-heading { background:rgba(255,255,255,.56); border-bottom-color:#e4e8eb; }
+html[data-theme="day"] .panel-heading { padding:14px 16px; }
+html[data-theme="day"] .stat-card { min-height:96px; border-top:3px solid var(--vc-charcoal); }
+html[data-theme="day"] .stats-grid { gap:10px; margin-bottom:12px; }
+html[data-theme="day"] .stat-card strong { color:var(--vc-charcoal); }
+html[data-theme="day"] .accent-blue { color:#147ea3; }
+html[data-theme="day"] .accent-amber { color:#725900; border-top-color:var(--fh-gold); }
+html[data-theme="day"] .accent-violet { color:#5b4aa5; }
+html[data-theme="day"] .accent-green { color:#167a58; border-top-color:#1ca474; }
+html[data-theme="day"] .accent-red { color:#a51f45; border-top-color:var(--fh-burgundy); }
+html[data-theme="day"] .vehicle-card { background:rgba(255,255,255,.9); border-color:#d6dde2; border-radius:8px; box-shadow:0 5px 16px rgba(51,62,72,.08); }
+html[data-theme="day"] .vehicle-cards { gap:10px; padding:12px; }
+html[data-theme="day"] .vehicle-card:hover { transform:none; border-color:var(--fh-blue); box-shadow:0 10px 24px rgba(51,62,72,.14); }
+@media (hover:hover) and (pointer:fine) { html[data-theme="day"] .vehicle-card:hover { transform:translateY(-2px); } }
+html[data-theme="day"] .vehicle-image { background:#eef1f3; }
+html[data-theme="day"] .vehicle-model,
+html[data-theme="day"] .vehicle-specs strong,
+html[data-theme="day"] .vehicle-maintenance-row strong { color:var(--vc-charcoal); }
+html[data-theme="day"] .vehicle-plate { color:#a51f45; }
+html[data-theme="day"] .vehicle-specs span,
+html[data-theme="day"] .vehicle-maintenance-row { background:#f7f9fa; border-color:#e1e6e9; }
+html[data-theme="day"] .vehicle-dispatch { border-color:rgba(216,49,91,.3); background:#fff1f4; color:#a51f45; }
+html[data-theme="day"] .vehicle-dispatch:hover { background:#ffe8eb; }
+html[data-theme="day"] .mobile-action:hover { border-color:var(--fh-blue); box-shadow:0 10px 24px rgba(51,62,72,.12); }
+html[data-theme="day"] .departure-action { border-top:4px solid var(--fh-burgundy); background:#fff; }
+html[data-theme="day"] .transfer-action { border-top:4px solid var(--fh-gold); background:#fffdf0; }
+html[data-theme="day"] .return-action { border-top:4px solid #1ca474; background:#f7fcfa; }
+html[data-theme="day"] .mobile-action-icon { color:var(--fh-burgundy); background:#fff0f2; }
+html[data-theme="day"] .transfer-action .mobile-action-icon { color:#725900; background:#fff4b0; }
+html[data-theme="day"] .return-action .mobile-action-icon { color:#167a58; background:#dff5eb; }
+html[data-theme="day"] .quick-select,
+html[data-theme="day"] .location-button { background:#fffbe0; color:#725900; border-color:var(--fh-gold); }
+html[data-theme="day"] .photo-section,
+html[data-theme="day"] .return-section,
+html[data-theme="day"] .vehicle-detail-section,
+html[data-theme="day"] .history-filters,
+html[data-theme="day"] .form-panel form > .form-grid > label,
+html[data-theme="day"] .form-panel form > .form-row > label { background:#f8fafb; border-color:#e1e6e9; }
+html[data-theme="day"] .form-panel form > .form-grid > label:focus-within,
+html[data-theme="day"] .form-panel form > .form-row > label:focus-within { border-color:rgba(10,36,99,.45); box-shadow:0 0 0 3px rgba(10,36,99,.1); }
+html[data-theme="day"] th { background:var(--fh-blue); color:#fff; }
+html[data-theme="day"] td { border-top-color:#e3e7ea; color:var(--vc-ink); }
+html[data-theme="day"] .task-row:hover > td { background:#fff8e1; }
+html[data-theme="day"] .task-row-selected > td { background:#fff3bf !important; }
+html[data-theme="day"] .task-timeline-pane { background:#f8fafb; }
+html[data-theme="day"] .task-list-caption { padding:11px 16px 7px; }
+html[data-theme="day"] .sold-vehicles-panel { border-color:var(--fh-gold); border-radius:8px; background:#fffdf0; }
+html[data-theme="day"] .sold-vehicles-panel summary { color:var(--vc-charcoal); }
+html[data-theme="day"] .sold-vehicles-panel summary small { border-color:var(--fh-gold); background:#fff4b0; color:#725900; }
+html[data-theme="day"] .auth-brand-panel { border-color:rgba(216,49,91,.28); background:#fff; }
+html[data-theme="day"] .auth-brand-panel::before,
+html[data-theme="day"] .auth-brand-panel::after { display:none; }
+html[data-theme="day"] .auth-brand-label { color:var(--fh-burgundy); }
+html[data-theme="day"] .auth-brand-dot { background:var(--fh-burgundy); box-shadow:0 0 0 5px rgba(216,49,91,.12); }
+html[data-theme="day"] button:focus-visible,
+html[data-theme="day"] a:focus-visible,
+html[data-theme="day"] input:focus-visible,
+html[data-theme="day"] select:focus-visible,
+html[data-theme="day"] textarea:focus-visible { outline-color:var(--fh-blue); }
+
+/* Vehicle option catalog: field values are operational controls, so they use
+   solid light surfaces and high-contrast labels instead of translucent pills. */
+html[data-theme="day"] .vehicle-option-table { border-color:#cbd5dc; border-radius:8px; background:rgba(255,255,255,.86); box-shadow:0 5px 16px rgba(51,62,72,.05); }
+html[data-theme="day"] .vehicle-option-table-heading { align-items:flex-start; padding-bottom:12px; border-bottom:1px solid #dfe5e9; }
+html[data-theme="day"] .vehicle-option-table-heading h3 { color:#24313d; font-size:15px; }
+html[data-theme="day"] .vehicle-option-table-heading small,
+html[data-theme="day"] .vehicle-option-field-heading small,
+html[data-theme="day"] .vehicle-option-readonly p { color:#596978; font-weight:650; }
+html[data-theme="day"] .vehicle-option-field { border-color:#d2dbe1; border-radius:8px; background:#f3f6f7; box-shadow:inset 3px 0 0 rgba(10,36,99,.76); }
+html[data-theme="day"] .vehicle-option-field strong { color:#24313d; font-weight:800; }
+html[data-theme="day"] .vehicle-option-readonly { background:#fafbfc; box-shadow:inset 3px 0 0 #c8d1d7; }
+html[data-theme="day"] .vehicle-option-chip { border-color:#aebee6; color:#243d74; background:#edf2ff; font-weight:750; }
+html[data-theme="day"] .vehicle-option-chip button { border-color:#a51f45; color:#fff; background:#a51f45; }
+html[data-theme="day"] .vehicle-option-chip button:hover { border-color:#7f1735; background:#7f1735; }
+html[data-theme="day"] .vehicle-option-chip button:focus-visible { outline-color:#fff; box-shadow:0 0 0 4px rgba(10,36,99,.24); }
+html[data-theme="day"] .vehicle-option-add-row input { border-color:#bcc8d0; background:#fff; color:#202a33; }
+html[data-theme="day"] .vehicle-option-add-row .button-quiet { border-color:#aebbc5; background:#fff; color:#24313d; }
+html[data-theme="day"] .vehicle-option-add-row .button-quiet:hover { border-color:#a51f45; background:#fff4f6; color:#8e1739; }
+
+/* Shared daylight text hierarchy across the desktop console, mobile dispatch,
+   account administration and authentication screens. */
+html[data-theme="day"] h1,
+html[data-theme="day"] h2,
+html[data-theme="day"] h3 { color:#0d1225; }
+html[data-theme="day"] .eyebrow { color:#b02448; font-weight:800; letter-spacing:0; }
+html[data-theme="day"] .subtitle,
+html[data-theme="day"] .field-hint,
+html[data-theme="day"] .auth-intro-content > p:not(.eyebrow),
+html[data-theme="day"] .auth-note,
+html[data-theme="day"] .auth-login-hint,
+html[data-theme="day"] .account-status,
+html[data-theme="day"] .vehicle-meta,
+html[data-theme="day"] .task-meta,
+html[data-theme="day"] .driver,
+html[data-theme="day"] .mileage,
+html[data-theme="day"] .stage-label,
+html[data-theme="day"] footer { color:#596274; font-weight:500; }
+html[data-theme="day"] .account-summary { border-radius:0; }
+html[data-theme="day"] .account-summary::before { background:#f4d35e; }
+html[data-theme="day"] .account-summary span { color:#0a2463; font-weight:800; }
+html[data-theme="day"] .account-summary small { color:#3d4358; font-weight:650; }
+html[data-theme="day"] .top-actions .button { min-height:40px; border-radius:8px; color:#1a1f35; }
+html[data-theme="day"] .top-actions .button-quiet { border-color:#c4cedb; background:rgba(255,255,255,.88); }
+html[data-theme="day"] .top-actions .button-quiet:hover { border-color:#0a2463; background:#f0f4fa; color:#0a2463; }
+html[data-theme="day"] .top-actions .button-primary { color:#fff; background:#0a2463; box-shadow:0 7px 16px rgba(10,36,99,.18); }
+html[data-theme="day"] .top-actions .button-primary:hover { background:#061842; }
+html[data-theme="day"] .auth-brand-signal span,
+html[data-theme="day"] .auth-brand-footer,
+html[data-theme="day"] .auth-permission-list span { color:#596274; }
+
+/* Day mode uses the same task hierarchy as night mode, with quiet blue work
+   surfaces and filled navigation blocks that remain readable in sunlight. */
+html[data-theme="day"] .vehicle-maintenance-panel { border-color:#c6d4e2; background:linear-gradient(145deg,#ffffff,#f1f6fb); box-shadow:inset 0 1px 0 #fff,0 10px 26px rgba(10,36,99,.07); }
+html[data-theme="day"] .vehicle-maintenance-panel .section-heading { border-bottom-color:#d9e3ec; }
+html[data-theme="day"] .vehicle-maintenance-panel .section-heading h3 { color:#0d2440; }
+html[data-theme="day"] .maintenance-form label { color:#22344a; }
+html[data-theme="day"] .maintenance-form input,
+html[data-theme="day"] .maintenance-form textarea { border-color:#b9c9d7; background:#fff; color:#14263b; box-shadow:inset 0 1px 0 rgba(10,36,99,.03); }
+html[data-theme="day"] .maintenance-form input::placeholder,
+html[data-theme="day"] .maintenance-form textarea::placeholder { color:#74879b; }
+html[data-theme="day"] .maintenance-form input[type="file"] { color:#53677a; }
+html[data-theme="day"] .maintenance-form input[type="file"]::file-selector-button { color:#fff; background:#0a2463; }
+html[data-theme="day"] .maintenance-form input[type="file"]::file-selector-button:hover { background:#061842; }
+html[data-theme="day"] .maintenance-form .field-hint { color:#64778b; }
+html[data-theme="day"] .maintenance-plan { border-color:#9fc1d7; background:linear-gradient(135deg,#eaf4fb,#f7fbfe); box-shadow:inset 3px 0 0 #0a2463; }
+html[data-theme="day"] .maintenance-plan legend { color:#0a2463; }
+html[data-theme="day"] .maintenance-history-heading { border-top-color:#d9e3ec; }
+html[data-theme="day"] .maintenance-history-heading strong { color:#14263b; }
+html[data-theme="day"] .top-actions > a.button-quiet { border-color:#b9c8d8; background:linear-gradient(145deg,#eaf1f8,#dfeaf4); box-shadow:inset 0 1px 0 rgba(255,255,255,.9); }
+html[data-theme="day"] .top-actions > a.button-quiet:hover { border-color:#0a2463; background:linear-gradient(145deg,#dbe9f7,#cedff0); color:#071f57; }
+html[data-theme="day"] #notificationSettingsLink { background:linear-gradient(145deg,#e3f1f3,#d3e8ed); }
+html[data-theme="day"] #vehicleOptionsLink { background:linear-gradient(145deg,#e9eafa,#dcdef2); }
+html[data-theme="day"] #reservationLink { background:linear-gradient(145deg,#e5f0eb,#d7e8df); }
+html[data-theme="day"] #historyLink { background:linear-gradient(145deg,#ececf4,#e0e1ee); }
+html[data-theme="day"] #logoutButton { border-color:#d7a8b4; color:#8e1739; background:#fff0f3; }
+html[data-theme="day"] #logoutButton:hover { border-color:#a51f45; background:#ffe3e9; color:#75112f; }
+@media (max-width:650px) {
+  html[data-theme="day"] body { background-size:30px 30px,30px 30px,100% 100%,100% 100%; }
+  html[data-theme="day"] body::after,
+  html[data-theme="day"] body:has(#overviewView:not([hidden])) main::after,
+  html[data-theme="day"] body:has(#overviewView:not([hidden])) #overviewView::before { display:none; }
+  html[data-theme="day"] body:not(.apply-view) main::before { top:-4px; left:0; width:96px; height:34px; }
+  html[data-theme="day"] body:has(#overviewView:not([hidden])) #overviewView::after { width:58%; bottom:3%; }
+  html[data-theme="day"] body.apply-view .mobile-logout-button { min-height:32px; padding:7px 9px; font-size:10px; }
+  html[data-theme="day"] body.auth-page::before { opacity:.48; background-size:480px 330px,430px 320px,560px 280px,100% 100%; background-position:-100px 58%,calc(100% + 100px) -20px,55% calc(100% + 18px),0 0; }
+  html[data-theme="day"] body.auth-page::after { inset:6% -24% 7%; opacity:.55; }
+  html[data-theme="day"] .shell { padding-top:8px; padding-bottom:16px; }
+  html[data-theme="day"] .topbar { border-top-width:3px; }
+  html[data-theme="day"] .panel-heading { padding:13px 14px; }
+  html[data-theme="day"] .stat-card { min-height:88px; }
+  html[data-theme="day"] .brand-lockup { margin-bottom:10px; }
+  html[data-theme="day"] .brand-mark { width:34px; height:34px; font-size:12px; }
+  html[data-theme="day"] .brand-copy strong { font-size:12px; }
+  html[data-theme="day"] .brand-copy small { font-size:7px; }
+}
+
+/* Day-mode scroll performance keeps the editorial background static without
+   repeatedly sampling the content behind translucent surfaces. */
+html[data-theme="day"] body { background-attachment:scroll; }
+html[data-theme="day"] body::before { transform:translateZ(0); backface-visibility:hidden; }
+html[data-theme="day"] .topbar,
+html[data-theme="day"] .panel,
+html[data-theme="day"] .stat-card,
+html[data-theme="day"] .auth-card,
+html[data-theme="day"] .vehicle-card,
+html[data-theme="day"] .mobile-action {
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+
+html[data-theme="day"] .timeline-date-filters { border-bottom-color:#dfe5e9; background:rgba(248,250,251,.72); }
+html[data-theme="day"] .timeline-date-filters input { border-color:#cbd4da; background:#fff; color:#202a33; }
+html[data-theme="day"] .booking-admin-panel { border-top:3px solid var(--fh-gold); }
+html[data-theme="day"] .booking-approve { color:#126f50; }
+html[data-theme="day"] .maintenance-critical { color:#fff; background:#a51f45; border-color:#8e1739; }
+html[data-theme="day"] .vehicle-log-book-file { color:#0a2463; }

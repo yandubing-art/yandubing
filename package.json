@@ -1,0 +1,26 @@
+{
+  "name": "lark-dispatch-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lark 自建应用与多维表格调度联动后端",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "tracker:dev": "tsx src/tracker-sync.ts",
+    "tracker:start": "node dist/tracker-sync.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "pdfjs-dist": "^6.3.289",
+    "playwright-core": "^1.63.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
