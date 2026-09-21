@@ -69,7 +69,49 @@ export type TrackerVehicleMatch = {
 };
 
 export function normalizeTrackerIdentifier(value: string | undefined | null): string {
-  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return String(value || "")
+    .toUpperCase()
+    .replace(/\s*[（(]\s*\d+\s*[）)]\s*$/, "")
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function trackerTimestampMs(value: string | undefined): number {
+  const timestamp = Date.parse(value || "");
+  return Number.isFinite(timestamp) ? timestamp : -1;
+}
+
+function hasNumberedRegistration(value: string | undefined): boolean {
+  return /\s*[（(]\s*\d+\s*[）)]\s*$/.test(String(value || ""));
+}
+
+/**
+ * Tracker can expose one physical unit more than once, appending (1), (2),
+ * etc. to the registration. Keep the newest snapshot for matching and use
+ * the unnumbered registration when timestamps are equal.
+ */
+export function deduplicateTrackerRecords(records: TrackerVehicleSnapshot[]): TrackerVehicleSnapshot[] {
+  const byRegistration = new Map<string, TrackerVehicleSnapshot>();
+  for (const record of records) {
+    const registrationKey = normalizeTrackerIdentifier(record.registration);
+    if (!registrationKey) continue;
+    const previous = byRegistration.get(registrationKey);
+    if (!previous) {
+      byRegistration.set(registrationKey, record);
+      continue;
+    }
+    const currentTime = trackerTimestampMs(record.trackerTimestamp);
+    const previousTime = trackerTimestampMs(previous.trackerTimestamp);
+    const currentIsPreferred = currentTime > previousTime
+      || (currentTime === previousTime && !hasNumberedRegistration(record.registration) && hasNumberedRegistration(previous.registration));
+    const selected = currentIsPreferred ? record : previous;
+    const canonicalRegistration = !hasNumberedRegistration(record.registration)
+      ? record.registration
+      : !hasNumberedRegistration(previous.registration)
+        ? previous.registration
+        : selected.registration;
+    byRegistration.set(registrationKey, canonicalRegistration === selected.registration ? selected : { ...selected, registration: canonicalRegistration });
+  }
+  return [...byRegistration.values()];
 }
 
 export function trackerVehicleKey(vehicle: { tableId: string; recordId: string }): string {
@@ -81,12 +123,13 @@ export function matchTrackerVehicle(
   vehicle: { tableId: string; recordId: string; plate?: string; vehicleIdentificationNumber?: string }
 ): TrackerVehicleMatch {
   const base = { vehicleKey: trackerVehicleKey(vehicle), tableId: vehicle.tableId, recordId: vehicle.recordId };
+  const uniqueRecords = deduplicateTrackerRecords(records);
   const vin = normalizeTrackerIdentifier(vehicle.vehicleIdentificationNumber);
   const plate = normalizeTrackerIdentifier(vehicle.plate);
-  const plateMatches = plate ? records.filter((record) => normalizeTrackerIdentifier(record.registration) === plate) : [];
+  const plateMatches = plate ? uniqueRecords.filter((record) => normalizeTrackerIdentifier(record.registration) === plate) : [];
   if (plateMatches.length > 1) return { ...base, status: "pending_confirmation", reason: "duplicate_plate" };
   if (vin) {
-    const byVin = records.filter((record) => normalizeTrackerIdentifier(record.vin) === vin);
+    const byVin = uniqueRecords.filter((record) => normalizeTrackerIdentifier(record.vin) === vin);
     if (byVin.length > 1) return { ...base, status: "pending_confirmation", reason: "duplicate_vin" };
     if (byVin.length === 1) return { ...base, status: "matched", reason: "vin", snapshot: byVin[0] };
   }
@@ -123,7 +166,7 @@ export class TrackerStatusStore {
         ...EMPTY_STATE,
         ...parsed,
         version: 2,
-        records: Array.isArray(parsed.records) ? parsed.records as TrackerVehicleSnapshot[] : [],
+        records: Array.isArray(parsed.records) ? deduplicateTrackerRecords(parsed.records as TrackerVehicleSnapshot[]) : [],
         refreshRequest: parsed.refreshRequest && typeof parsed.refreshRequest === "object" ? parsed.refreshRequest as TrackerRefreshRequest : null,
         audit: Array.isArray(parsed.audit) ? (parsed.audit as TrackerSyncAuditEntry[]).slice(-100) : []
       };
@@ -146,6 +189,7 @@ export class TrackerStatusStore {
     const now = new Date().toISOString();
     const current = this.read();
     const source: TrackerSyncAuditEntry["source"] = input.source || "unknown";
+    const records = deduplicateTrackerRecords(input.records);
     const completedRefresh = Boolean(input.completedRefreshRequestId && current.refreshRequest?.id === input.completedRefreshRequestId);
     return this.persist({
       ...current,
@@ -156,7 +200,7 @@ export class TrackerStatusStore {
       reportCreatedAt: input.reportCreatedAt,
       source,
       sourceHash: input.sourceHash,
-      records: input.records,
+      records,
       refreshRequest: completedRefresh ? null : current.refreshRequest,
       lastRefreshCompletedAt: completedRefresh ? now : current.lastRefreshCompletedAt,
       audit: [...current.audit, {
@@ -164,7 +208,7 @@ export class TrackerStatusStore {
         completedAt: now,
         success: true,
         source,
-        recordCount: input.records.length,
+        recordCount: records.length,
         sourceHash: input.sourceHash,
         error: ""
       }].slice(-100)

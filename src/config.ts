@@ -137,7 +137,7 @@ function buildConfig() {
     nextMaintenanceMileage: listEnv("VEHICLE_NEXT_MAINTENANCE_FIELDS", "Next Service Due | 下次保养里程,Next Service Due,下次保养里程,下次保养公里数"),
     nextMaintenanceDate: listEnv("VEHICLE_NEXT_MAINTENANCE_DATE_FIELDS", "Next Service Date | 下次保养日期,Next Service Date,下次保养日期"),
     registeringAuthority: listEnv("VEHICLE_REGISTERING_AUTHORITY_FIELDS", "Registering authority | 注册地点,Registering authority,注册地点"),
-    lastServiceDate: listEnv("VEHICLE_LAST_SERVICE_DATE_FIELDS", "Last Service Date | 上次保养日期,Last Service Date,上次保养日期"),
+    lastServiceDate: listEnv("VEHICLE_LAST_SERVICE_DATE_FIELDS", "Last Service Date | 上次保养日期,Last Service Date,上次保养日期,Service Date"),
     serviceProvider: listEnv("VEHICLE_SERVICE_PROVIDER_FIELDS", "Service Provider | 服务提供商,Service Provider,服务提供商"),
     spareKey: listEnv("VEHICLE_SPARE_KEY_FIELDS", "Spare Key | 备用钥匙,Spare Key,备用钥匙"),
     registerNumber: listEnv("VEHICLE_REGISTER_NUMBER_FIELDS", "Register number | 注册号,Register number,注册号"),

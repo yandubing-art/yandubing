@@ -5,7 +5,7 @@ import { chromium, type BrowserContext, type Download, type Locator, type Page }
 import { config } from "./config.js";
 import { readTrackerVehicleList } from "./tracker-live.js";
 import { TrackerHistoryStore } from "./tracker-history-store.js";
-import { TrackerStatusStore } from "./tracker-status-store.js";
+import { deduplicateTrackerRecords, TrackerStatusStore } from "./tracker-status-store.js";
 
 const statusStore = new TrackerStatusStore();
 const historyStore = new TrackerHistoryStore();
@@ -234,10 +234,11 @@ export async function syncTrackerReportOnce(completedRefreshRequestId?: string):
       }
     }
     parsed ||= await readTrackerVehicleList(page, statusStore.read().records);
-    const historyRecords = historyStore.appendSnapshots(parsed.records);
-    statusStore.writeSuccess({ ...parsed, source, completedRefreshRequestId });
-    console.log("Tracker vehicle data synchronized", { source, records: parsed.records.length, historyRecords, reportCreatedAt: parsed.reportCreatedAt });
-    return parsed.records.length;
+    const records = deduplicateTrackerRecords(parsed.records);
+    const historyRecords = historyStore.appendSnapshots(records);
+    statusStore.writeSuccess({ ...parsed, records, source, completedRefreshRequestId });
+    console.log("Tracker vehicle data synchronized", { source, records: records.length, historyRecords, reportCreatedAt: parsed.reportCreatedAt });
+    return records.length;
   } catch (error) {
     const detail = message(error);
     if (config.trackerErrorScreenshotPath && activeContext) {
@@ -261,9 +262,10 @@ async function importReport(filePath: string): Promise<void> {
   statusStore.writeAttempt();
   const { parseTrackerVehicleReportPdf } = await import("./tracker-report.js");
   const parsed = await parseTrackerVehicleReportPdf(fs.readFileSync(path.resolve(filePath)));
-  const historyRecords = historyStore.appendSnapshots(parsed.records);
-  statusStore.writeSuccess({ ...parsed, source: "report" });
-  console.log("Tracker report imported", { records: parsed.records.length, historyRecords, reportCreatedAt: parsed.reportCreatedAt });
+  const records = deduplicateTrackerRecords(parsed.records);
+  const historyRecords = historyStore.appendSnapshots(records);
+  statusStore.writeSuccess({ ...parsed, records, source: "report" });
+  console.log("Tracker report imported", { records: records.length, historyRecords, reportCreatedAt: parsed.reportCreatedAt });
 }
 
 async function hasActiveDispatch(): Promise<boolean> {

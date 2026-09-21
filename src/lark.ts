@@ -19,12 +19,13 @@ const previewStoreNames = [
   "VC14 Mimosa Mall", "VC15 Baywest Mall", "VC16 Longbeach Mall", "VC17 Tygervalley",
   "VC18 Eastgate", "VC19 Riverside Mall", "VC20 Bester Brown", "VC21 City View",
   "VC22 Pavillion Mall", "VC23 Oudtshoorn", "VC24 Menlyn", "VC25 Fourways", "VC26 Rivonia",
-  "VC27 Centurion Mall", "VC28 Clearwater Mall", "VCL01 Randburg", "VCL02 Centurion",
+  "VC27 Centurion Mall", "VC28 Clearwater Mall", "VC29 Boulders", "VC30 Wonderboom",
+  "VCL01 Randburg", "VCL02 Centurion",
   "VCL03 Alberton", "VCL04 Vaal", "VCL05 Boksburg", "VCL06 Atterbury", "VCL07 Secunda",
   "VCL08 North Rand", "VCL09 Somerset", "VCL10 Blueberry", "VCL11 Polofields", "VCL12 Reef",
   "VCL13 Irene Links", "VCL14 Brackenfell", "VCL15 Ryneveld", "VCL16 Horizon",
   "VCL17 Randfontein", "VCL18 Harvest", "VCL19 Bethlehem", "VCL20 Lambton Gardens",
-  "VCL21 Comaro", "VCL22 Randsteam", "VCL23 Waterfall", "Warehouse", "head office", "Deli", "Tophida"
+  "VCL21 Comaro", "VCL22 Randsteam", "VCL23 Waterfall", "Warehouse", "宿舍"
 ];
 
 type RecordListData = {
@@ -140,6 +141,13 @@ type VehicleProfileInput = {
 
 function lookupKey(value: string): string {
   return value.normalize("NFKC").replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function configuredTableNameMatches(actualName: string, configuredName: string): boolean {
+  const actual = lookupKey(actualName);
+  const configured = lookupKey(configuredName);
+  if (!actual || !configured) return false;
+  return actual === configured || actual.startsWith(`${configured}|`) || actual.startsWith(`${configured}:`);
 }
 
 function vehicleKey(value: unknown): string {
@@ -504,20 +512,32 @@ export class LarkClient {
     const vehicle = (await this.listVehicles()).find((item) => item.tableId === tableId && item.recordId === recordId);
     const file = vehicle?.logBookAttachments.find((item) => item.fileToken === fileToken);
     if (!vehicle || !file) throw new Error("未找到该车辆的大本附件");
-    const path = `https://open.larksuite.com/open-apis/drive/v1/medias/${encodeURIComponent(fileToken)}/download`;
+    return this.downloadVehicleMedia(tableId, recordId, fileToken, file.name, "飞书大本下载失败");
+  }
+
+  async downloadVehicleImage(tableId: string, recordId: string, fileToken: string): Promise<{ fileName: string; mimeType: string; content: Buffer }> {
+    const vehicle = (await this.listVehicles()).find((item) => item.tableId === tableId && item.recordId === recordId);
+    const allowed = vehicle ? [vehicle.photoFileToken, vehicle.fleetCardPhotoFileToken].filter(Boolean) : [];
+    if (!vehicle || !allowed.includes(fileToken)) throw new Error("未找到该车辆图片附件");
+    const name = fileToken === vehicle.photoFileToken ? "vehicle-photo" : "fleet-card-photo";
+    return this.downloadVehicleMedia(tableId, recordId, fileToken, name, "飞书车辆图片下载失败");
+  }
+
+  private async downloadVehicleMedia(tableId: string, recordId: string, fileToken: string, fileName: string, errorLabel: string): Promise<{ fileName: string; mimeType: string; content: Buffer }> {
+    const path = `/open-apis/bitable/v1/apps/${encodeURIComponent(config.bitableAppToken)}/tables/${encodeURIComponent(tableId)}/records/${encodeURIComponent(recordId)}/attachments/${encodeURIComponent(fileToken)}/download`;
     // Vehicle-profile writes already use the connected Base administrator. Use
     // the same identity for attachments, then retain the app-token fallback
     // for deployments that were configured before the OAuth upload flow.
     let response: Response;
     try {
-      response = await fetch(path, { headers: { Authorization: `Bearer ${await this.photoSyncToken()}` } });
-      if (!response.ok) response = await fetch(path, { headers: { Authorization: `Bearer ${await this.getAccessToken()}` } });
+      response = await fetch(`https://open.larksuite.com${path}`, { headers: { Authorization: `Bearer ${await this.photoSyncToken()}` } });
+      if (!response.ok) response = await fetch(`https://open.larksuite.com${path}`, { headers: { Authorization: `Bearer ${await this.getAccessToken()}` } });
     } catch {
-      response = await fetch(path, { headers: { Authorization: `Bearer ${await this.getAccessToken()}` } });
+      response = await fetch(`https://open.larksuite.com${path}`, { headers: { Authorization: `Bearer ${await this.getAccessToken()}` } });
     }
-    if (!response.ok) throw new Error(`飞书大本下载失败：HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`${errorLabel}：HTTP ${response.status}`);
     const mimeType = response.headers.get("content-type")?.split(";")[0] || "application/octet-stream";
-    return { fileName: file.name, mimeType, content: Buffer.from(await response.arrayBuffer()) };
+    return { fileName, mimeType, content: Buffer.from(await response.arrayBuffer()) };
   }
 
   async listRecords(): Promise<BitableRecord[]> {
@@ -703,8 +723,8 @@ export class LarkClient {
     if (config.vehicleTableIds.length) {
       return config.vehicleTableIds.map((tableId, index) => ({ tableId, tableName: config.vehicleTableNames[index] || tableId }));
     }
-    const wanted = new Set(config.vehicleTableNames.map(lookupKey));
-    return (await this.listTables()).filter((table) => wanted.has(lookupKey(table.tableName)));
+    const tables = await this.listTables();
+    return tables.filter((table) => config.vehicleTableNames.some((name) => configuredTableNameMatches(table.tableName, name)));
   }
 
   private async listVehicleFields(tableId: string): Promise<Array<{ name: string; type: number }>> {
@@ -739,7 +759,7 @@ export class LarkClient {
         model: ["CADDY KOMBI 2.0TDi", "VN 54X- CRAFTER", "P-SERIES", "BR-V", "HIACE", "HINO 300-814", "NP200 1.6"],
         type: ["Mini bus", "Bakkie", "SUV", "Sedan", "PANEL VAN", "3.5 ton van body"],
         status: ["In Use", "Available for Use", "Under Maintenance", "Out of Service", "Sold", "待补录"],
-        owner: ["Administration | 行政部", "Maintenance | 维护部", "Operations | 运营部", "Procurement | 采购部", "Warehouse | 仓库部", "Store | 门店", "Tophida"],
+        owner: ["Administration | 行政部", "Maintenance | 维护部", "Operations | 运营部", "Procurement | 采购部", "Warehouse | 仓库部", "Store | 门店", ...previewStoreNames],
         registeringAuthority: ["约翰内斯堡 | Johannesburg", "比勒陀利亚 | Pretoria", "开普敦 | Cape Town", "德班 | Durban"],
         insurance: ["YES", "NO"]
       };
@@ -774,6 +794,11 @@ export class LarkClient {
         field.options.forEach((option) => add(key, option));
       }
     }
+    // Store Base is the source of truth for the complete store catalogue.
+    // Merge it into the owner choices so a vehicle can be assigned to a store
+    // even when that store is not yet used by an existing vehicle record.
+    const stores = await this.listStores();
+    stores.forEach((store) => add("owner", store.name));
     return result;
   }
 
@@ -874,7 +899,19 @@ export class LarkClient {
   }
 
   private async listVehicleFieldsWithOptions(tableId: string): Promise<Array<{ id: string; name: string; type: number | string; multiple: boolean; options: string[] }>> {
-    if (config.previewMode) return (await this.listVehicleFields(tableId)).map((field) => ({ ...field, id: `preview-${tableId}-${lookupKey(field.name).replace(/[^a-z0-9]+/g, "-")}`, multiple: false, options: [] }));
+    if (config.previewMode) {
+      const options = await this.listVehicleFieldOptions();
+      return (await this.listVehicleFields(tableId)).map((field) => {
+        const key = vehicleFieldKey(field.name);
+        return {
+          ...field,
+          id: `preview-${tableId}-${lookupKey(field.name).replace(/[^a-z0-9]+/g, "-")}`,
+          type: key ? 3 : field.type,
+          multiple: false,
+          options: key ? options[key] : []
+        };
+      });
+    }
     const fields: Array<{ id: string; name: string; type: number | string; multiple: boolean; options: string[] }> = [];
     let pageToken = "";
     do {
@@ -916,7 +953,15 @@ export class LarkClient {
       const table = tables[tableIndex];
       const dateFieldNames = tableFields[tableIndex].filter((field) => field.type === 5).map((field) => field.name);
       for (const record of tableRecords[tableIndex]) {
-        const plateField = findField(record.fields, config.vehicleFields.plate);
+        const plateField = findField(record.fields, [
+          ...config.vehicleFields.plate,
+          "Number Plate",
+          "Plate Number",
+          "Registration Number",
+          "Registration",
+          "License Plate",
+          "车牌号"
+        ]);
         // Keep records with a blank plate in the overview so the fleet team can
         // complete the profile; dispatchEligibility will keep them out of
         // dispatch selectors until a plate is supplied.
@@ -995,6 +1040,8 @@ export class LarkClient {
           selectFieldNames: [brandField, typeField, statusField, ownerField, yearField, registeringAuthorityField, insuranceField].filter((field): field is { name: string; value: unknown } => Boolean(field && Array.isArray(field.value))).map((field) => field.name),
           dispatchEligible: dispatchEligibility(plate, model, status),
           photoUrl: photos[0]?.url || "",
+          photoFileToken: photos[0]?.fileToken,
+          fleetCardPhotoFileToken: fleetCardPhotos[0]?.fileToken,
           mileage: numberValue(mileageField?.value),
           nextMaintenanceMileage: numberValue(nextField?.value),
           nextMaintenanceDate: dateInputValue(nextDateField?.value),
@@ -1011,6 +1058,13 @@ export class LarkClient {
         });
       }
     }
+    console.info("Lark vehicle sync", {
+      tables: tables.map((table) => ({ id: table.tableId, name: table.tableName })),
+      records: tableRecords.reduce((count, records) => count + records.length, 0),
+      vehicles: vehicles.length,
+      withPlate: vehicles.filter((vehicle) => vehicle.plate.trim()).length,
+      missingPlate: vehicles.filter((vehicle) => !vehicle.plate.trim()).length
+    });
     return vehicles;
   }
 
@@ -1056,6 +1110,21 @@ export class LarkClient {
     await this.updateRecord(vehicle.recordId, { [vehicle.currentMileageField]: String(mileage) }, vehicle.tableId);
     const updatedVehicle = { ...vehicle, mileage };
     return { status: "updated", matched: true, updated: true, vehicle: updatedVehicle, message: `已将 ${vehicle.plate} 车辆档案公里数更新为 ${mileage}` };
+  }
+
+  async syncBackendVehiclePhoto(vehicle: VehicleProfile, upload: { fileName: string; dataUrl: string }): Promise<string> {
+    if (!vehicle.photoFieldConfigured) throw new Error(`${vehicle.tableName} 尚未配置车辆照片字段`);
+    const fields: Record<string, unknown> = {};
+    if (config.previewMode) {
+      fields[vehicle.photoField] = [{ name: upload.fileName, url: upload.dataUrl, file_token: `preview_file_${crypto.randomUUID()}` }];
+    } else {
+      await this.addVehicleAttachment(fields, vehicle.photoField, upload.fileName, upload.dataUrl);
+    }
+    const updatedRecord = await this.updateRecord(vehicle.recordId, fields, vehicle.tableId, !config.previewMode);
+    const remoteToken = attachmentValues(updatedRecord?.fields[vehicle.photoField])[0]?.fileToken || "";
+    if (!remoteToken) throw new Error("飞书未返回同步后的车辆照片附件 token");
+    this.invalidateVehiclesCache();
+    return remoteToken;
   }
 
   async updateVehicleProfile(tableId: string, recordId: string, input: VehicleProfileInput): Promise<VehicleProfile> {
@@ -1467,16 +1536,14 @@ export class LarkClient {
     const timeField = phase === "departure" ? config.fields.departurePhotoTime : config.fields.returnPhotoTime;
     const checkResultField = phase === "departure" ? config.fields.departureCheckResult : config.fields.returnCheckResult;
     const notesField = phase === "departure" ? config.fields.departurePhotoNotes : config.fields.returnPhotoNotes;
-    const attachments: Array<Record<string, unknown>> = [];
-    for (const photo of photos) {
+    const attachments = await Promise.all(photos.map(async (photo): Promise<Record<string, unknown>> => {
       const fileName = `vehicle-${phase}-${photo.position}-${Date.now()}.jpg`;
       if (config.previewMode) {
-        attachments.push({ name: fileName, url: photo.dataUrl, file_token: `preview_file_${crypto.randomUUID()}` });
-      } else {
-        const media = await this.uploadMedia(fileName, photo.dataUrl);
-        attachments.push({ file_token: media.file_token, name: fileName });
+        return { name: fileName, url: photo.dataUrl, file_token: `preview_file_${crypto.randomUUID()}` };
       }
-    }
+      const media = await this.uploadMedia(fileName, photo.dataUrl);
+      return { file_token: media.file_token, name: fileName };
+    }));
     const fields: Record<string, unknown> = {
       [attachmentField]: attachments,
       [timeField]: dateTimeTimestamp(photoTime),

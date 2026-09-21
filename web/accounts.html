@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f4f7fb" />
     <title>账号管理 · 车辆调度控制台</title>
-    <link rel="stylesheet" href="/styles.css?v=20260916-guideline-fixes-1" />
+    <link rel="stylesheet" href="/styles.css?v=20260919-interface-restore-1" />
     <link rel="stylesheet" href="/valueco-day.css?v=20260915-vehicle-compliance-1" />
     <link rel="stylesheet" href="/valueco-refined.css?v=20260915-feihong-console-static-route-1" />
   </head>
   <body class="account-page">
     <div class="shell">
       <header class="topbar">
-        <div><p class="eyebrow">ACCESS CONTROL</p><div class="title-row"><h1>账号管理</h1><button id="languageToggle" class="language-toggle" type="button" aria-label="切换中英文">English</button><button id="themeToggle" class="theme-toggle" type="button">自动模式</button></div><p class="subtitle">为 Lark 账号和独立账号分配角色与调度权限</p></div>
-        <div class="top-actions"><a class="button button-quiet" href="/">桌面调度台</a><a class="button button-quiet" href="/?view=apply">移动调度</a><button id="logoutButton" class="button button-quiet" type="button">退出登录</button></div>
+        <div><p class="eyebrow">ACCESS CONTROL</p><div class="title-row"><h1>账号管理</h1><button id="languageToggle" class="language-toggle" type="button" aria-label="切换中英文">English</button><button id="themeToggle" class="theme-toggle" type="button">自动模式</button></div><p class="subtitle">按模块、数据范围和具体操作分配账号权限</p></div>
+        <div class="top-actions"><a class="button button-primary" href="/permissions">权限管理</a><a class="button button-quiet" href="/?view=overview">返回桌面调度台</a><a class="button button-quiet" href="/?view=apply">移动调度</a><button id="logoutButton" class="button button-quiet" type="button">退出登录</button></div>
       </header>
       <main>
         <section class="panel">
@@ -34,12 +34,12 @@
           <p id="accountNotice" class="account-status" role="status"></p>
         </section>
         <section class="panel" style="margin-top:18px">
-          <div class="panel-heading"><div><p class="eyebrow">ROLE DIRECTORY</p><h2>账号与权限</h2></div><p class="field-hint">调度员仅能使用移动调度；其余角色按职责开放桌面、同步、车辆或账号管理权限。</p></div>
-          <div class="account-table-wrap"><table class="account-table"><thead><tr><th>账号</th><th>所属部门</th><th>来源</th><th>角色</th><th>状态</th><th>最后登录</th><th>操作</th></tr></thead><tbody id="accountsRows"><tr><td colspan="7" class="empty">正在读取账号…</td></tr></tbody></table></div>
+          <div class="panel-heading"><div><p class="eyebrow">ACCOUNT DIRECTORY</p><h2>账号与角色</h2></div><p class="field-hint">账号、部门、角色和状态在此维护；详细权限请进入二级权限管理界面。</p></div>
+          <div class="account-table-wrap"><table class="account-table"><thead><tr><th>账号</th><th>所属部门</th><th>来源</th><th>角色</th><th>权限概览</th><th>状态</th><th>最后登录</th><th>操作</th></tr></thead><tbody id="accountsRows"><tr><td colspan="8" class="empty">正在读取账号…</td></tr></tbody></table></div>
         </section>
       </main>
     </div>
     <script src="/theme.js?v=20260916-guideline-fixes-1"></script>
-    <script src="/accounts.js?v=20260916-guideline-fixes-1" defer></script>
+    <script src="/accounts.js?v=20260919-interface-restore-1" defer></script>
   </body>
 </html>

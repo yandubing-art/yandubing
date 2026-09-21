@@ -4,11 +4,26 @@
   const isMobile = ["apply", "departure", "transfer", "return", "booking"].includes(view);
   const isTransferView = view === "transfer";
   const isReturnOnly = view === "return";
+  const phoneLanguages = Array.isArray(navigator.languages) && navigator.languages.length ? navigator.languages : [navigator.language || "en"];
+  const browserLanguage = phoneLanguages.some((language) => /^zh(?:-|$)/i.test(String(language))) ? "zh" : "en";
+  const languageOverride = sessionStorage.getItem("dispatch_language_override_v2");
+  const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  const touchDevice = coarsePointer || Number(navigator.maxTouchPoints || 0) > 0;
+  const lowPerformanceDevice = /Android/i.test(navigator.userAgent || "")
+    || (Number.isFinite(navigator.hardwareConcurrency) && navigator.hardwareConcurrency <= 4)
+    || (Number.isFinite(navigator.deviceMemory) && navigator.deviceMemory <= 4);
+  // iPadOS Safari can report itself as Macintosh. Use touch capability rather
+  // than the platform string so Windows touch laptops and Mac touch devices
+  // get the same low-paint scroll path.
+  const scrollPerformanceDevice = isMobile || touchDevice || lowPerformanceDevice;
+  if (lowPerformanceDevice) document.documentElement.classList.add("low-performance");
+  if (scrollPerformanceDevice) document.documentElement.classList.add("scroll-performance");
   const timelineScales = ["day", "hour", "week", "month", "year"];
   const photoPositions = ["front", "rear", "left", "right"];
   const allPhotoPositions = [...photoPositions, "extra"];
   const state = {
-    language: sessionStorage.getItem("dispatch_language") === "en" ? "en" : "zh",
+    language: languageOverride === "en" || languageOverride === "zh" ? languageOverride : browserLanguage,
+    mobileFlow: view,
     user: null,
     tasks: [],
     users: [],
@@ -29,6 +44,10 @@
     photos: { departure: {}, return: {} },
     photoCapturedAt: { departure: {}, return: {} },
     notificationSettings: [],
+    notificationReminders: {
+      maintenance: { enabled: true, daysBefore: 30, mileageBefore: 1000, frequencyHours: 24, maxSends: 3 },
+      inspection: { enabled: true, daysBefore: 30, mileageBefore: 0, frequencyHours: 24, maxSends: 3 }
+    },
     trackerStatus: null,
     trackerVehicleKey: "",
     trackerHistoryEntries: [],
@@ -44,23 +63,48 @@
     selectedTaskId: "",
     lastInspectedTaskId: "",
     quickStatusFilter: "",
-    hasUnsavedChanges: false
+    hasUnsavedChanges: false,
+    optionsLoading: false,
+    optionsError: ""
   };
-  const OPTIONS_CACHE_KEY = "dispatch_options_cache_v1";
-  try {
-    const cached = JSON.parse(localStorage.getItem(OPTIONS_CACHE_KEY) || "null");
-    if (cached && typeof cached === "object") {
+  const OPTIONS_CACHE_KEY_PREFIX = "dispatch_options_cache_v3:";
+  const OPTIONS_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+  function optionsCacheKey() {
+    const account = state.user?.accountId || state.user?.username || "anonymous";
+    return `${OPTIONS_CACHE_KEY_PREFIX}${encodeURIComponent(account)}`;
+  }
+
+  function loadOptionsCache() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(optionsCacheKey()) || "null");
+      if (!cached || typeof cached !== "object" || (cached.savedAt && Date.now() - cached.savedAt > OPTIONS_CACHE_MAX_AGE_MS)) return false;
       state.users = Array.isArray(cached.users) ? cached.users : [];
       state.vehicles = Array.isArray(cached.vehicles) ? cached.vehicles : [];
       state.stores = Array.isArray(cached.stores) ? cached.stores : [];
       state.vehicleFieldOptions = cached.vehicleFieldOptions && typeof cached.vehicleFieldOptions === "object" ? cached.vehicleFieldOptions : state.vehicleFieldOptions;
+      if (isMobile) {
+        renderDispatchVehicleOptions();
+        window.setTimeout(() => renderOptions(), 0);
+        return true;
+      }
+      renderOptions();
+      renderVehicleDepartmentFilter();
+      renderVehicles();
+      renderRows();
+      renderHistory();
+      renderTrackerHistoryVehicleOptions();
+      renderVehicleEditorOptions();
+      return true;
+    } catch (_) {
+      // A blocked or malformed browser cache must never prevent Lark loading.
+      return false;
     }
-  } catch (_) {
-    // A blocked or malformed browser cache must never prevent Lark loading.
   }
+
   function saveOptionsCache() {
     try {
-      localStorage.setItem(OPTIONS_CACHE_KEY, JSON.stringify({ users: state.users, vehicles: state.vehicles, stores: state.stores, vehicleFieldOptions: state.vehicleFieldOptions, savedAt: Date.now() }));
+      localStorage.setItem(optionsCacheKey(), JSON.stringify({ users: state.users, vehicles: state.vehicles, stores: state.stores, vehicleFieldOptions: state.vehicleFieldOptions, savedAt: Date.now() }));
     } catch (_) {
       // Quota/private-mode errors are non-fatal; the server cache still works.
     }
@@ -72,6 +116,10 @@
   const vehicleForm = $("vehicleForm");
   const maintenanceForm = $("maintenanceForm");
   const notice = $("notice");
+  const appLoadingOverlay = $("appLoadingOverlay");
+  const appLoadingTitle = $("appLoadingTitle");
+  const appLoadingDetail = $("appLoadingDetail");
+  let appReady = false;
   const rows = $("taskRows");
   const bookingRows = $("bookingRows");
   const searchInput = $("searchInput");
@@ -156,7 +204,7 @@
   // Keep Base values (such as vehicle types, store names and task status values)
   // unchanged. This catalogue only translates the application interface.
   const zhToEn = {
-    "车辆调度控制台": "Vehicle Dispatch Console", "移动设备调度": "Mobile Vehicle Dispatch", "移动设备调度 · 出发": "Mobile Vehicle Dispatch · Departure", "移动设备调度 · 中转": "Mobile Vehicle Dispatch · Transfer", "移动设备调度 · 返回": "Mobile Vehicle Dispatch · Return", "先看车况，再进入调度或车辆档案": "Review vehicle status, then dispatch or manage fleet records", "仅用于车辆出发、中转与返回登记": "For departure, transfer and return records only", "手机调度": "Mobile dispatch", "桌面调度台": "Desktop console", "车辆预约": "Vehicle reservation", "出行记录": "Trip records", "返回选择操作": "Back to action menu", "立即同步": "Sync now", "退出登录": "Sign out", "账号管理": "Account management", "通知设置": "Notification settings", "当前用户": "Signed-in user", "管理员": "Administrator", "调度员": "Dispatcher", "排程员": "Scheduler", "车队管理员": "Fleet manager",
+    "车辆调度控制台": "Vehicle Dispatch Console", "移动设备调度": "Mobile Vehicle Dispatch", "移动设备调度 · 出发": "Mobile Vehicle Dispatch · Departure", "移动设备调度 · 中转": "Mobile Vehicle Dispatch · Transfer", "移动设备调度 · 返回": "Mobile Vehicle Dispatch · Return", "先看车况，再进入调度或车辆档案": "Review vehicle status, then dispatch or manage fleet records", "仅用于车辆出发、中转与返回登记": "For departure, transfer and return records only", "手机调度": "Mobile dispatch", "桌面调度台": "Desktop console", "车辆预约": "Vehicle reservation", "出行记录": "Trip records", "返回选择操作": "Back to action menu", "立即同步": "Sync now", "退出登录": "Sign out", "账号管理": "Account management", "通知设置": "Notification settings", "当前用户": "Signed-in user", "管理员": "Administrator", "调度员": "Dispatcher", "排程员": "Scheduler", "车队管理员": "Fleet manager", "正在加载车辆调度": "Loading vehicle dispatch", "正在确认登录状态…": "Checking sign-in status…", "正在读取账户权限…": "Reading account permissions…", "正在读取车辆和任务数据…": "Loading vehicles and tasks…", "正在打开目标页面…": "Opening the requested page…", "加载失败": "Loading failed", "请检查网络后重试": "Check the network and try again",
     "选择操作": "Choose an action", "请选择本次要办理的车辆流程": "Choose the vehicle workflow to process", "出发": "Departure", "中转": "Transfer", "返回": "Return", "新建调度、登记出发公里数和车况照片": "Create a dispatch and record departure mileage and condition photos", "登记中转地点，保留在同一条调度任务中": "Record the transfer stop and keep it in the same dispatch task", "选择在途任务，登记返程公里数和车况": "Select an active task, then record return mileage and condition", "选择返程车辆": "Choose a returning vehicle", "仅显示尚未完成的调度任务": "Only unfinished dispatches are shown",
     "全部任务": "All tasks", "待处理": "Open", "执行中": "In progress", "已完成": "Completed", "失败": "Failed", "当前调度表": "Current dispatch table", "待调度 / 已排程": "Pending / scheduled", "已发送到执行器": "Sent to executor", "本次同步结果": "Latest sync result", "需要人工关注": "Needs attention",
     "车辆总览": "Fleet overview", "全部": "All", "行政部": "Administration", "维护部": "Maintenance", "运营部": "Operations", "采购部": "Procurement", "仓库部": "Warehouse", "门店部": "Stores", "已售车辆": "Sold vehicles", "添加已售车辆": "Add sold vehicle", "新增已售车辆": "Add sold vehicle", "保存已售车辆": "Save sold vehicle", "已售车辆会标记为不可调度，仅在已售车辆区域显示。": "Sold vehicles are not dispatchable and appear only in the sold vehicles area.", "请选择车辆档案表": "Select a vehicle record table", "已售车辆已添加。": "Sold vehicle added.", "没有已售车辆。": "No sold vehicles.", "全部原始车辆档案": "All source vehicle records", "全部部门 / 门店": "All departments / stores", "未设置部门 / 门店": "Department / store not set", "信息待补全": "Information to complete", "新建调度": "New dispatch", "连接后加载车辆档案。": "Connect to load vehicle records.", "调度任务": "Dispatch tasks", "调度任务列表": "Dispatch task list", "点击一条任务可在右侧时间线定位": "Select a task to locate it in the timeline", "与调度任务联动": "Linked to dispatch tasks", "任务时间线": "Task timeline", "小时": "Hour", "天": "Day", "周": "Week", "月": "Month", "年": "Year", "条任务": "tasks", "搜索任务、地点、车辆、驾驶人": "Search task, location, vehicle or driver", "全部状态": "All statuses", "已预约": "Reserved", "待调度": "Pending", "已排程": "Scheduled", "取消": "Cancelled", "按状态筛选": "Filter by status", "连接后加载任务。": "Connect to load tasks.", "任务 / 驾驶人": "Task / driver", "出发时间": "Departure time", "路线": "Route", "车辆 / 里程": "Vehicle / mileage", "状态": "Status", "结果": "Result", "删除": "Delete",
@@ -168,7 +216,7 @@
     "未填写": "Not entered", "未编号": "Unnumbered", "未分配": "Unassigned", "未分配部门": "No department", "未分配车辆": "No vehicle assigned", "车型未配置": "Model not configured", "未设置": "Not set", "不可调度": "Not dispatchable", "正常": "Normal", "需要保养": "Maintenance due", "下次保养": "Next maintenance", "待补全": "To complete", "车辆资料完整": "Vehicle profile complete", "车辆资料已完整。": "Vehicle profile is complete.", "本表未设置": "Not configured in this table", "未上传": "Not uploaded", "已上传": "Uploaded",
     "年份未填写": "Year not entered", "当前公里数字段": "Current mileage field", "保养里程字段": "Maintenance mileage field", "保养日期字段": "Maintenance date field", "年检到期日期": "Inspection expiry date", "车辆大本": "Vehicle log book", "车辆照片": "Vehicle photo", "车辆照片（可选）": "Vehicle photo (optional)", "加油油卡图片": "Fuel card photo", "加油油卡图片（可选）": "Fuel card photo (optional)", "品牌": "Brand", "所属部门/门店": "Store / department", "未设置部门/门店": "Store / department not set", "状态待确认": "Status to confirm",
     "用此车新建调度": "New dispatch with this vehicle", "不可新建调度": "Dispatch unavailable", "管理车辆": "Manage vehicle", "编辑": "Edit", "填写返程 ›": "Complete return ›", "出发": "Departure", "返程": "Return", "出发前": "Before departure", "驾驶人": "Driver", "当前公里数": "Current mileage", "档案当前": "Current in record", "档案未填写当前公里数": "Current mileage is not entered in the record", "未设置下次保养里程": "Next maintenance mileage is not set", "下次保养公里数": "Next maintenance mileage", "下次保养计划": "Next maintenance plan", "两项需一起填写，提交后同步回车辆档案": "Both fields are required and will sync to the vehicle record", "车辆信息": "Vehicle information", "里程与保养": "Mileage and maintenance", "注册与证件": "Registration and documents", "保险与配套": "Insurance and accessories", "已到保养里程": "Maintenance mileage reached", "保养里程正常": "Maintenance mileage normal", "本表未设置保养里程字段": "No maintenance mileage field in this table", "未填写车牌": "Number plate not entered", "保养确认与保修资料": "Maintenance confirmation and warranty documents", "确认后会回写车辆档案中已存在的保养日期、服务商和公里数字段，并保留历史记录。": "Confirmation updates existing service date, provider and mileage fields in the vehicle record and keeps an audit history.", "保养日期": "Service date", "保养公里数": "Service mileage", "服务提供商": "Service provider", "保修单文档": "Warranty document", "支持 PDF、JPG、PNG、WebP，最大 12 MB": "PDF, JPG, PNG or WebP, up to 12 MB", "保养说明": "Service notes", "记录保养项目、保修范围或其他说明": "Record service items, warranty coverage or other notes", "确认本次保养": "Confirm maintenance", "保养历史": "Maintenance history", "正在读取保养记录…": "Loading maintenance records…", "暂无保养记录。": "No maintenance records.", "保养记录": "Maintenance record", "确认人": "Confirmed by", "已回写字段": "Updated fields", "保修单": "Warranty document", "下载": "Download", "车辆档案照片": "Vehicle profile photo", "建议上传清晰原图；列表使用轻量缩略图，详情页再加载高清图。": "Upload a clear original; lists use a lightweight thumbnail and details load the high-quality image.", "车辆照片需要同时提交原图和缩略图": "The vehicle photo requires both the original and thumbnail.", "保养记录读取失败：": "Maintenance records failed to load: ", "保养确认失败：": "Maintenance confirmation failed: ", "保养已确认。": "Maintenance confirmed.", "文件大小不能超过 12 MB": "The file must be no larger than 12 MB", "请选择有效的保修单文件": "Choose a valid warranty document", "车辆定位": "Vehicle location", "打开 Tracker 定位平台": "Open Tracker location platform", "在 Tracker 平台查看已关联车辆的实时位置。单车地图与自动回传须使用 Tracker 官方 API 凭证。": "View the live location of linked vehicles in Tracker. Per-vehicle maps and automatic sync require official Tracker API credentials.",
-    "没有匹配的调度任务。": "No matching dispatch tasks.", "暂无可办理返程的调度任务。": "No return dispatch tasks are available.", "暂无可办理中转的调度任务。": "No transfer dispatch tasks are available.", "已中转": "Transferred", "登记中转 ›": "Record transfer ›", "修改中转 ›": "Edit transfer ›", "更新中转登记": "Update transfer record", "没有读取到车辆档案。": "No vehicle records were found.", "这个部门 / 门店暂无匹配车辆。": "No matching vehicles in this department / store.", "提交出发登记": "Submit departure record", "出发登记": "Departure record", "编辑任务": "Edit task", "保存修改": "Save changes", "已加时间水印": "Timestamp watermark added", "正在保存车辆资料…": "Saving vehicle information…", "车辆资料已更新。": "Vehicle information updated.", "车辆资料完整，可用于调度与保养提醒。": "Vehicle profile is complete and ready for dispatch and maintenance reminders.", "编辑车辆资料": "Edit vehicle information", "车辆档案照片": "Vehicle record photo", "新车辆照片预览": "New vehicle photo preview", "新加油油卡图片预览": "New fuel card photo preview",
+    "没有匹配的调度任务。": "No matching dispatch tasks.", "暂无可办理返程的调度任务。": "No return dispatch tasks are available.", "暂无可办理中转的调度任务。": "No transfer dispatch tasks are available.", "已中转": "Transferred", "登记中转 ›": "Record transfer ›", "修改中转 ›": "Edit transfer ›", "更新中转登记": "Update transfer record", "没有读取到车辆档案。": "No vehicle records were found.", "这个部门 / 门店暂无匹配车辆。": "No matching vehicles in this department / store.", "正在读取车辆…": "Loading vehicles…", "车辆选项读取失败，请重试": "Vehicle options failed to load; retry", "提交出发登记": "Submit departure record", "出发登记": "Departure record", "编辑任务": "Edit task", "保存修改": "Save changes", "已加时间水印": "Timestamp watermark added", "正在保存车辆资料…": "Saving vehicle information…", "车辆资料已更新。": "Vehicle information updated.", "车辆资料完整，可用于调度与保养提醒。": "Vehicle profile is complete and ready for dispatch and maintenance reminders.", "编辑车辆资料": "Edit vehicle information", "车辆档案照片": "Vehicle record photo", "新车辆照片预览": "New vehicle photo preview", "新加油油卡图片预览": "New fuel card photo preview",
     "请先连接后端。": "Connect to the backend first.", "请输入后端令牌。": "Enter the backend token.", "请输入后端令牌后连接。": "Enter the backend token, then connect.", "请选择驾驶人": "Select a driver", "输入姓名或英文名匹配": "Type a name or English name to match", "输入姓名或英文名，系统会自动匹配公司人员": "Type a name or English name; the system matches a company person", "已匹配：": "Matched: ", "未匹配到公司人员，请从建议中选择": "No company person matched; choose from the suggestions", "照片": "Photo", "张照片已准备，提交时上传。": "photos ready to upload on submission.", "请补齐前、后、左、右四张照片；补充照片为选填。": "Add front, rear, left and right photos; the extra photo is optional.", "正在读取多维表格…": "Loading Base…", "正在执行同步…": "Syncing…", "读取失败：": "Load failed: ", "同步失败：": "Sync failed: ", "保存失败：": "Save failed: ", "处理照片失败：": "Photo processing failed: ", "无法读取图片": "Unable to read the image", "图片压缩失败": "Image compression failed", "图片转换失败": "Image conversion failed"
   };
   zhToEn["进入 Tracker 官方车辆定位平台查看已关联车辆。当前未接入 Tracker 官方 API，因此不会伪造单车定位参数。"] = "Open the official Tracker vehicle location platform to view linked vehicles. The Tracker official API is not connected, so no per-vehicle parameters are fabricated.";
@@ -183,11 +231,8 @@
     "Tracker 更新状态": "Tracker update status",
     "数据时间": "Data time",
     "最后同步": "Last sync",
-    "最新": "Current",
-    "延迟": "Delayed",
-    "过期": "Stale",
-    "可能离线": "Possibly offline",
-    "需要检查设备": "Check Tracker device",
+    "更新不足1小时": "Updated less than 1 hour ago",
+    "超过24小时未更新 · 需要关注": "No update for more than 24 hours · Needs attention",
     "待确认": "Pending confirmation",
     "Tracker 未匹配": "Tracker not matched",
     "等待 Tracker 自动同步": "Waiting for automatic Tracker sync",
@@ -223,6 +268,11 @@
     "查询记录": "Search records",
     "重置": "Reset",
     "快速范围": "Quick range",
+    "1 小时": "1 hour",
+    "2 小时": "2 hours",
+    "4 小时": "4 hours",
+    "6 小时": "6 hours",
+    "12 小时": "12 hours",
     "24 小时": "24 hours",
     "7 天": "7 days",
     "30 天": "30 days",
@@ -260,7 +310,7 @@
   zhToEn["待填写日期"] = "Date not set";
   zhToEn["下次保养日期"] = "Next maintenance date";
   zhToEn["保养日期字段"] = "Maintenance date field";
-  Object.assign(zhToEn, { "自动模式": "Auto mode", "日间模式": "Day mode", "夜间模式": "Night mode", "跳到主内容": "Skip to main content", "查看出行记录": "View trip records", "保养状态": "Maintenance status", "默认当前登录人，可改选其他人员": "Defaults to the signed-in user; other personnel can be selected", "默认匹配登录人部门，也可切换部门再选择车牌；仅显示可调度车辆。": "Defaults to the signed-in user's department; switch departments to choose another plate. Only dispatchable vehicles are shown." });
+  Object.assign(zhToEn, { "自动模式": "Auto mode", "日间模式": "Day mode", "夜间模式": "Night mode", "跳到主内容": "Skip to main content", "查看出行记录": "View trip records", "保养状态": "Maintenance status", "默认当前登录人，可改选其他人员": "Defaults to the signed-in user; other personnel can be selected", "移动调度默认显示全部可调度车辆，也可按部门筛选；仅显示可调度车辆。": "Mobile dispatch shows all dispatchable vehicles by default; filter by department when needed.", "权限管理": "Permission settings", "返回选择返程任务": "Back to return task list", "返回选择中转任务": "Back to transfer task list" });
   Object.assign(zhToEn, { "未选择任务": "No task selected", "点击左侧任务查看详情、操作和时间线。": "Select a task to review its details, actions and timeline.", "任务结果": "Task result", "任务检查器": "Task inspector", "选择任务后在右侧查看处理上下文和时间线": "Select a task to review its context and timeline on the right" });
   const enToZh = Object.fromEntries(Object.entries(zhToEn).map(([zh, en]) => [en, zh]));
   const zhEntries = Object.entries(zhToEn).sort((a, b) => b[0].length - a[0].length);
@@ -293,11 +343,31 @@
     $("appTitle").textContent = "移动设备调度";
     $("appSubtitle").textContent = "仅用于车辆出发、中转与返回登记";
     $("viewSwitch").textContent = "桌面调度台";
-    $("viewSwitch").href = "/";
+    $("viewSwitch").href = "/?view=overview";
     $("backToOverviewButton").textContent = "返回选择操作";
   }
 
   function setNotice(message, kind = "") { notice.textContent = localizeMessage(message); notice.className = `notice ${kind}`.trim(); }
+  function setAppLoading(title, detail) {
+    if (appLoadingTitle && title) appLoadingTitle.textContent = localizeMessage(title);
+    if (appLoadingDetail && detail) appLoadingDetail.textContent = localizeMessage(detail);
+  }
+  function hideAppLoading() {
+    appReady = true;
+    document.documentElement.classList.remove("app-booting");
+    if (!appLoadingOverlay) return;
+    appLoadingOverlay.classList.remove("is-visible");
+    const hideTimer = window.setTimeout(() => appLoadingOverlay.setAttribute("hidden", ""), 220);
+    appLoadingOverlay.dataset.hideTimer = String(hideTimer);
+  }
+  function showAppLoading() {
+    document.documentElement.classList.add("app-booting");
+    if (!appLoadingOverlay) return;
+    if (appLoadingOverlay.dataset.hideTimer) window.clearTimeout(Number(appLoadingOverlay.dataset.hideTimer));
+    delete appLoadingOverlay.dataset.hideTimer;
+    appLoadingOverlay.removeAttribute("hidden");
+    appLoadingOverlay.classList.add("is-visible");
+  }
   function setInlineStatus(element, message, kind = "") { if (!element) return; element.setAttribute("aria-live", "polite"); element.setAttribute("aria-atomic", "true"); element.textContent = localizeMessage(message); element.className = `field-hint ${kind}`.trim(); }
   function setBookingSubmitBusy(isBusy) {
     const button = bookingForm?.querySelector('button[type="submit"]');
@@ -315,8 +385,9 @@
   function markFormDirty() { state.hasUnsavedChanges = true; }
   function clearFormDirty() { state.hasUnsavedChanges = false; }
   function prefersReducedMotion() { return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false; }
-  function contextualScrollBehavior() { return "auto"; }
+  function contextualScrollBehavior() { return prefersReducedMotion() || scrollPerformanceDevice ? "auto" : "smooth"; }
   function playFeedback(element, keyframes, duration) {
+    if (scrollPerformanceDevice) return;
     if (!element?.animate) return;
     element.getAnimations().forEach((animation) => animation.cancel());
     element.animate(keyframes, { duration, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "none" });
@@ -330,7 +401,7 @@
     playFeedback(element, reduced ? [{ opacity: 0.72 }, { opacity: 1 }] : [{ opacity: 0.72, transform: "translateY(3px)" }, { opacity: 1, transform: "translateY(0)" }], reduced ? 160 : 140);
   }
   function playTimelineRefreshFeedback(element) { playFeedback(element, [{ opacity: 0.72 }, { opacity: 1 }], 160); }
-  function headers() { return { "Content-Type": "application/json" }; }
+  function headers() { return { "Content-Type": "application/json", "X-Dispatch-Client": isMobile ? "mobile" : "desktop" }; }
   function escapeHtml(value) { return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]); }
   function cleanDisplay(value) { return String(value ?? "").replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\s+/g, " ").trim(); }
   function dateInputValue(value) {
@@ -406,6 +477,9 @@
   }
   function setDefaultVehicleDepartment(select) {
     if (!select || select.dataset.departmentTouched === "true" || select.value) return;
+    // Mobile dispatchers can choose a vehicle from any department. Start with
+    // the complete eligible list and keep the department selector as a filter.
+    if (isMobile) return;
     const user = currentUserOption();
     const department = departmentKey(user?.department || state.user?.department || "");
     if (department && vehicleDispatchDepartmentOptions.some(([value]) => value === department)) select.value = department;
@@ -454,13 +528,17 @@
     const target = views.find(([, viewName]) => viewName === name)?.[0];
     const update = () => views.forEach(([id, viewName]) => { $(id).hidden = viewName !== name; });
     if (target && !$(target).hidden && document.startViewTransition) return null;
-    if (document.startViewTransition) return document.startViewTransition(update);
+    if (!scrollPerformanceDevice && document.startViewTransition) return document.startViewTransition(update);
     update();
     return null;
   }
 
   function showOverview() {
-    if (isMobile) { window.location.href = "?view=apply"; return; }
+    if (isMobile) {
+      history.pushState(null, "", "?view=apply");
+      showMobileHome();
+      return;
+    }
     document.body.classList.remove("editor-mode");
     showOnly("overview");
     history.replaceState(null, "", "?view=overview");
@@ -483,18 +561,21 @@
 
 
   function showMobileHome() {
-    document.body.classList.remove("editor-mode");
+    state.mobileFlow = "apply";
+    document.body.classList.remove("editor-mode", "return-mode");
     showOnly("mobile");
   }
 
   function showReturnPicker() {
-    document.body.classList.remove("editor-mode");
+    state.mobileFlow = "return";
+    document.body.classList.remove("editor-mode", "return-mode");
     showOnly("returnPicker");
     renderReturnPicker();
   }
 
   function showTransferPicker() {
-    document.body.classList.remove("editor-mode");
+    state.mobileFlow = "transfer";
+    document.body.classList.remove("editor-mode", "return-mode");
     showOnly("transferPicker");
     renderTransferPicker();
   }
@@ -528,7 +609,7 @@
     $("accountName").textContent = state.user.displayName || state.user.username;
     $("accountRole").textContent = roleLabel(state.user.role);
     $("accountManagementLink").hidden = !userCan("manage_accounts");
-    $("notificationSettingsLink").hidden = !userCan("manage_accounts");
+    $("notificationSettingsLink").hidden = !userCan("manage_notifications");
     $("vehicleOptionsLink").hidden = !userCan("manage_vehicles");
     $("vehicleOptionsOverviewLink").hidden = !userCan("manage_vehicles");
     $("syncButton").hidden = !userCan("sync_dispatch");
@@ -536,9 +617,17 @@
     $("deleteVehicleDetailButton").hidden = !userCan("manage_vehicles");
     $("addSoldVehicleButton").hidden = !userCan("manage_vehicles");
     $("reservationLink").hidden = !userCan("desktop_console");
-    $("historyLink").hidden = !userCan("desktop_console");
-    $("trackerHistoryLink").hidden = !userCan("desktop_console");
-    $("bookingAdminPanel").hidden = !userCan("sync_dispatch");
+    $("historyLink").hidden = !userCan("view_history");
+    $("trackerHistoryLink").hidden = !userCan("view_tracker_history");
+    $("bookingAdminPanel").hidden = !userCan("approve_bookings");
+    $("photoSyncConnectButton").hidden = !userCan("manage_photo_sync");
+    $("photoSyncConnectButton").closest("article")?.toggleAttribute("hidden", !userCan("manage_photo_sync"));
+    $("notificationSettingsContent")?.closest("article")?.toggleAttribute("hidden", !userCan("manage_notifications"));
+    $("vehicleMaintenancePanel").hidden = !userCan("manage_maintenance");
+    $("trackerRefreshButton").hidden = !userCan("refresh_tracker");
+    $("formSubmitButton").hidden = view === "departure" ? !userCan("submit_departure") : (!userCan("create_dispatch") && !userCan("edit_own_dispatch") && !userCan("edit_all_dispatch"));
+    $("transferSubmitButton").hidden = !userCan("submit_transfer");
+    $("returnSubmitButton").hidden = !userCan("submit_return");
     if (isMobile) {
       ["accountManagementLink", "notificationSettingsLink", "viewSwitch", "reservationLink", "historyLink", "trackerHistoryLink", "syncButton"].forEach((id) => { if ($(id)) $(id).hidden = true; });
     } else if (!userCan("desktop_console")) {
@@ -560,7 +649,7 @@
   }
 
   async function loadPhotoSyncStatus() {
-    if (!userCan("manage_vehicles") || !photoSyncStatus) return;
+    if (!userCan("manage_photo_sync") || !photoSyncStatus) return;
     try {
       const response = await fetch("/api/admin/lark-photo-sync/status");
       const payload = await response.json();
@@ -621,10 +710,18 @@
   }
 
   function isOwnTask(task) {
-    if (userCan("desktop_console")) return true;
     const principal = state.user || {};
     const same = (left, right) => cleanDisplay(left).toLocaleLowerCase() === cleanDisplay(right).toLocaleLowerCase();
     return Boolean((principal.larkOpenId && task.requesterId && same(principal.larkOpenId, task.requesterId)) || (principal.displayName && task.requester && same(principal.displayName, task.requester)));
+  }
+
+  function isDepartedTask(task) {
+    if (["已预约", "待调度", "已排程", "已完成", "失败", "取消"].includes(task.status)) return false;
+    if (task.stage === "已返程") return false;
+    return task.status === "执行中"
+      || task.status === "已出发"
+      || ["已出发", "返程待登记"].includes(task.stage)
+      || (Array.isArray(task.departurePhotos) && task.departurePhotos.length > 0);
   }
 
   function renderStats() {
@@ -668,11 +765,13 @@
     }
     const selectionChanged = task.recordId !== state.lastInspectedTaskId;
     const model = vehicleByPlate(task.vehicle)?.modelDescription || task.vehicleModel || t("车型未配置");
-    const deleteAction = userCan("sync_dispatch") ? `<button class="action-link danger-link" data-inspector-delete="${escapeHtml(task.recordId)}">${t("删除")}</button>` : "";
+    const editAction = userCan("edit_all_dispatch") || userCan("edit_own_dispatch") ? `<button class="action-link" data-inspector-edit="${escapeHtml(task.recordId)}">${t("编辑")}</button>` : "";
+    const returnAction = userCan("submit_return") ? `<button class="action-link" data-inspector-return="${escapeHtml(task.recordId)}">${t("返程")}</button>` : "";
+    const deleteAction = userCan("delete_dispatch") ? `<button class="action-link danger-link" data-inspector-delete="${escapeHtml(task.recordId)}">${t("删除")}</button>` : "";
     title.textContent = task.taskNumber || t("未编号");
     status.innerHTML = `<span class="badge ${statusClass(task.status)}">${escapeHtml(t(task.status || "未设置"))}</span>`;
     details.innerHTML = `<div><span>${t("路线")}</span><strong>${escapeHtml(taskRoute(task) || "—")}</strong></div><div><span>${t("驾驶人")}</span><strong>${escapeHtml(task.requester || t("未填写"))}</strong></div><div><span>${t("车辆")}</span><strong>${escapeHtml(task.vehicle || t("未分配"))} · ${escapeHtml(model)}</strong></div><div><span>${t("出发时间")}</span><strong>${escapeHtml(formatDate(task.departureTime))}</strong></div><div><span>${t("任务结果")}</span><strong>${escapeHtml(task.result || task.error || "—")}</strong></div>`;
-    actions.innerHTML = `<button class="action-link" data-inspector-edit="${escapeHtml(task.recordId)}">${t("编辑")}</button><button class="action-link" data-inspector-return="${escapeHtml(task.recordId)}">${t("返程")}</button>${deleteAction}`;
+    actions.innerHTML = `${editAction}${returnAction}${deleteAction}`;
     state.lastInspectedTaskId = task.recordId;
     if (selectionChanged) playTaskInspectorFeedback(title.closest(".task-inspector-summary"));
   }
@@ -683,7 +782,7 @@
   }
 
   function renderBookingTable() {
-    if (!bookingRows || !userCan("sync_dispatch")) return;
+    if (!bookingRows || !userCan("approve_bookings")) return;
     const tasks = bookingAdminTasks();
     if (!tasks.length) {
       bookingRows.innerHTML = `<tr><td colspan="6" class="empty">${t("暂无车辆预约。")}</td></tr>`;
@@ -805,14 +904,14 @@
     historyRows.innerHTML = tasks.map((task) => {
       const model = vehicleByPlate(task.vehicle)?.modelDescription || task.vehicleModel || t("车型未配置");
       const mileage = task.returnMileage !== null ? `${t("出发")} ${formatMileage(task.mileage)} · ${t("返程")} ${formatMileage(task.returnMileage)}` : `${t("出发")} ${formatMileage(task.mileage)}`;
-      const deleteAction = userCan("sync_dispatch") ? `<button class="action-link danger-link" data-delete-id="${escapeHtml(task.recordId)}">${t("删除")}</button>` : "";
+      const deleteAction = userCan("delete_dispatch") ? `<button class="action-link danger-link" data-delete-id="${escapeHtml(task.recordId)}">${t("删除")}</button>` : "";
       return `<tr><td><strong>${escapeHtml(task.taskNumber || t("未编号"))}</strong></td><td>${escapeHtml(task.requester || t("未填写"))}</td><td>${escapeHtml(formatDate(task.departureTime))}</td><td class="route"><span>${escapeHtml(taskRoute(task) || "—")}</span>${task.returnOrigin || task.returnDestination ? `<small class="history-return-route">${escapeHtml(taskRoute(task, "return") || "—")}</small>` : ""}</td><td><span class="vehicle">${escapeHtml(task.vehicle || t("未分配"))}</span><span class="driver">${escapeHtml(model)}</span></td><td><span class="badge ${statusClass(task.status)}">${escapeHtml(t(task.status || "未设置"))}</span></td><td class="mileage">${escapeHtml(mileage)}</td><td class="row-actions"><button class="action-link" data-history-record="${escapeHtml(task.recordId)}">${t("查看")}</button>${deleteAction}</td></tr>`;
     }).join("");
   }
 
   function renderReturnPicker() {
     const container = $("returnTaskList");
-    const tasks = state.tasks.filter((task) => task.status !== "已完成" && task.status !== "取消" && isOwnTask(task));
+    const tasks = state.tasks.filter((task) => userCan("submit_return") && isOwnTask(task) && isDepartedTask(task) && task.status !== "已完成" && task.status !== "取消" && task.returnMileage === null && task.stage !== "已返程");
     if (!tasks.length) { container.innerHTML = `<div class="empty-card">${t("暂无可办理返程的调度任务。")}</div>`; return; }
     container.innerHTML = tasks.map((task) => `<button class="return-task-card" data-return-id="${escapeHtml(task.recordId)}"><span class="return-task-plate">${escapeHtml(task.vehicle || t("未分配车辆"))}</span><span>${escapeHtml(vehicleByPlate(task.vehicle)?.modelDescription || task.vehicleModel || t("车型未配置"))}</span><small>${task.tripMode === "中转" ? `${escapeHtml(t("中转"))} · ` : ""}${escapeHtml(taskRoute(task) || "—")} · ${t("出发")} ${escapeHtml(formatDate(task.departureTime))}</small><i>${t("填写返程 ›")}</i></button>`).join("");
   }
@@ -820,7 +919,7 @@
   function renderTransferPicker() {
     const container = $("transferTaskList");
     if (!container) return;
-    const tasks = state.tasks.filter((task) => task.status !== "已完成" && task.status !== "取消" && isOwnTask(task));
+    const tasks = state.tasks.filter((task) => userCan("submit_transfer") && isOwnTask(task) && isDepartedTask(task) && task.status !== "已完成" && task.status !== "取消" && task.returnMileage === null && task.stage !== "已返程");
     if (!tasks.length) { container.innerHTML = `<div class="empty-card">${t("暂无可办理中转的调度任务。")}</div>`; return; }
     container.innerHTML = tasks.map((task) => `<button class="return-task-card" data-transfer-id="${escapeHtml(task.recordId)}"><span class="return-task-plate">${escapeHtml(task.vehicle || t("未分配车辆"))}</span><span>${escapeHtml(vehicleByPlate(task.vehicle)?.modelDescription || task.vehicleModel || t("车型未配置"))}</span><small>${escapeHtml(taskRoute(task) || "—")} · ${t("出发")} ${escapeHtml(formatDate(task.departureTime))}${task.transferLocation ? ` · ${escapeHtml(t("已中转"))}：${escapeHtml(task.transferLocation)}` : ""}</small><i>${task.transferLocation ? t("修改中转 ›") : t("登记中转 ›")}</i></button>`).join("");
   }
@@ -940,7 +1039,13 @@
 
   function dispatchVehiclesFor(select) {
     const filter = select?.value || "";
-    return state.vehicles.filter((item) => item.dispatchEligible && !isSoldVehicle(item) && (!filter || vehicleDepartment(item) === filter));
+    const eligible = state.vehicles.filter((item) => item.dispatchEligible && !isSoldVehicle(item));
+    if (!filter) return eligible;
+    const filtered = eligible.filter((item) => vehicleDepartment(item) === filter);
+    // A user's department label may differ from the Base owner label. Do not
+    // leave the dispatch selector empty when the account can already see the
+    // vehicles but the optional category has no exact match.
+    return filtered.length ? filtered : eligible;
   }
 
   function trackerVehicleKey(vehicle) {
@@ -955,13 +1060,13 @@
   function trackerFreshness(match) {
     if (match?.status === "pending_confirmation") return { kind: "pending", label: t("待确认") };
     if (match?.status !== "matched" || !match.snapshot?.trackerTimestamp) return { kind: "missing", label: t("Tracker 未匹配") };
-    if (state.trackerStatus?.syncFailed) return { kind: "stale", label: t("过期") };
-    const age = Date.now() - Date.parse(match.snapshot.trackerTimestamp);
-    if (!Number.isFinite(age) || age > 24 * 60 * 60 * 1000) return { kind: "check", label: t("需要检查设备") };
-    if (age > 2 * 60 * 60 * 1000) return { kind: "offline", label: t("可能离线") };
-    if (age > 30 * 60 * 1000) return { kind: "stale", label: t("过期") };
-    if (age > 10 * 60 * 1000) return { kind: "delayed", label: t("延迟") };
-    return { kind: "current", label: t("最新") };
+    const timestamp = Date.parse(match.snapshot.trackerTimestamp);
+    const age = Date.now() - timestamp;
+    if (!Number.isFinite(age)) return { kind: "check", label: t("超过24小时未更新 · 需要关注") };
+    const hours = Math.max(0, Math.floor(Math.max(0, age) / (60 * 60 * 1000)));
+    if (hours >= 24) return { kind: "check", label: t("超过24小时未更新 · 需要关注") };
+    if (hours >= 1) return { kind: "stale", label: state.language === "en" ? `${hours} hour${hours === 1 ? "" : "s"} without update` : `${hours}小时未更新` };
+    return { kind: "current", label: t("更新不足1小时") };
   }
 
   function trackerTime(value) {
@@ -979,7 +1084,11 @@
 
   function trackerBadge(match) {
     const freshness = trackerFreshness(match);
-    return `<span class="tracker-status tracker-${freshness.kind}" title="${escapeHtml(t("Tracker 更新状态"))}: ${escapeHtml(freshness.label)}">${escapeHtml(freshness.label)}</span>`;
+    const actualState = match?.status === "matched" && match.snapshot
+      ? String(match.snapshot.status || "").trim() || t("未填写")
+      : "";
+    const actualSuffix = actualState ? ` <span class="tracker-actual-inline">(${escapeHtml(actualState)})</span>` : "";
+    return `<span class="tracker-status tracker-${freshness.kind}" title="${escapeHtml(t("Tracker 更新状态"))}: ${escapeHtml(freshness.label)}${actualState ? ` (${escapeHtml(actualState)})` : ""}">${escapeHtml(freshness.label)}${actualSuffix}</span>`;
   }
 
   function trackerActualStateBadge(match, showUnavailable = false) {
@@ -1013,7 +1122,7 @@
       : `<div class="tracker-dialog-empty"><div class="tracker-dialog-status-row"><span>${t("Tracker 更新状态")}</span>${trackerBadge(match)}</div><p>${escapeHtml(trackerMatchMessage(match))}</p>${state.trackerStatus?.syncFailed ? syncWarning : ""}</div>`;
     if (trackerRefreshButton) {
       const pending = Boolean(state.trackerStatus?.refresh?.pending);
-      trackerRefreshButton.hidden = !userCan("manage_vehicles");
+      trackerRefreshButton.hidden = !userCan("refresh_tracker");
       trackerRefreshButton.disabled = pending;
       trackerRefreshButton.setAttribute("aria-busy", String(pending));
       trackerRefreshButton.textContent = t(pending ? "刷新已排队" : "立即刷新");
@@ -1220,7 +1329,7 @@
       const trackerMatch = state.trackerStatus ? trackerMatchForVehicle(vehicle) : null;
       const completeness = missing.length ? `<p class="vehicle-completeness incomplete">${t("待补全")} ${missing.length} ${state.language === "en" ? "fields: " : "项："}${escapeHtml(missing.map(t).join(state.language === "en" ? ", " : "、"))}</p>` : `<p class="vehicle-completeness complete">${t("车辆资料完整")}</p>`;
       const managementAction = userCan("manage_vehicles") ? `<button class="vehicle-edit" data-vehicle-table="${escapeHtml(vehicle.tableId)}" data-vehicle-record="${escapeHtml(vehicle.recordId)}">${t("管理车辆")}</button>` : "";
-      return `<article class="vehicle-card"><div class="vehicle-image">${photo}</div><div class="vehicle-card-body"><div class="vehicle-kicker">${escapeHtml(department)}</div><div class="vehicle-model">${escapeHtml(vehicle.modelDescription || t("车型未配置"))}</div><div class="vehicle-plate">${escapeHtml(vehicle.plate || t("未填写车牌"))}</div><div class="vehicle-specs"><span><small>${t("年份")}</small><strong>${escapeHtml(year)}</strong></span><span><small>${t("当前公里数")}</small><strong>${escapeHtml(mileage)}</strong></span></div><div class="vehicle-maintenance-row"><span>${t("下次保养")}</span><strong>${escapeHtml(nextMaintenance)}</strong></div><div class="vehicle-maintenance-row"><span>${t("下次保养日期")}</span><strong>${escapeHtml(nextMaintenanceDate)}</strong></div><div class="vehicle-maintenance-row"><span>${t("年检到期日期")}</span><strong>${escapeHtml(inspectionExpiry)}</strong></div>${completeness}<div class="vehicle-card-status">${state.trackerStatus ? `${trackerActualStateBadge(trackerMatch, true)}${trackerBadge(trackerMatch)}` : trackerActualStateBadge(null, true)}${reminderBadge(maintenance)}${reminderBadge(inspection)}</div><div class="vehicle-actions"><button class="vehicle-dispatch" data-new-plate="${escapeHtml(vehicle.plate)}" ${vehicle.dispatchEligible ? "" : "disabled"}>${t(vehicle.dispatchEligible ? "用此车新建调度" : "不可新建调度")}</button>${managementAction}<button class="vehicle-locate" type="button" data-tracker-table="${escapeHtml(vehicle.tableId)}" data-tracker-record="${escapeHtml(vehicle.recordId)}">${t("车辆位置状态")}</button></div></div></article>`;
+      return `<article class="vehicle-card"><div class="vehicle-image">${photo}</div><div class="vehicle-card-body"><div class="vehicle-kicker">${escapeHtml(department)}</div><div class="vehicle-model">${escapeHtml(vehicle.modelDescription || t("车型未配置"))}</div><div class="vehicle-plate">${escapeHtml(vehicle.plate || t("未填写车牌"))}</div><div class="vehicle-specs"><span><small>${t("年份")}</small><strong>${escapeHtml(year)}</strong></span><span><small>${t("当前公里数")}</small><strong>${escapeHtml(mileage)}</strong></span></div><div class="vehicle-maintenance-row"><span>${t("下次保养")}</span><strong>${escapeHtml(nextMaintenance)}</strong></div><div class="vehicle-maintenance-row"><span>${t("下次保养日期")}</span><strong>${escapeHtml(nextMaintenanceDate)}</strong></div><div class="vehicle-maintenance-row"><span>${t("年检到期日期")}</span><strong>${escapeHtml(inspectionExpiry)}</strong></div>${completeness}<div class="vehicle-card-status">${state.trackerStatus ? trackerBadge(trackerMatch) : ""}${reminderBadge(maintenance)}${reminderBadge(inspection)}</div><div class="vehicle-actions"><button class="vehicle-dispatch" data-new-plate="${escapeHtml(vehicle.plate)}" ${vehicle.dispatchEligible ? "" : "disabled"}>${t(vehicle.dispatchEligible ? "用此车新建调度" : "不可新建调度")}</button>${managementAction}<button class="vehicle-locate" type="button" data-tracker-table="${escapeHtml(vehicle.tableId)}" data-tracker-record="${escapeHtml(vehicle.recordId)}">${t("车辆位置状态")}</button></div></div></article>`;
   }
 
   function renderVehicleCards(container, vehicles, emptyMessage) {
@@ -1265,6 +1374,7 @@
   }
 
   function populateStoreQuickChoices(input, select) {
+    if (!input || !select) return;
     const current = input.value;
     const options = state.stores.map((store) => `<option value="${escapeHtml(store.name)}">${escapeHtml(store.name)}</option>`).join("");
     select.innerHTML = `<option value="">${t("快速选择门店")}</option>` + options;
@@ -1294,13 +1404,20 @@
     renderVehicleDepartmentQuickSelect(bookingVehicleDepartmentQuickSelect);
     setDefaultVehicleDepartment(vehicleDepartmentQuickSelect);
     setDefaultVehicleDepartment(bookingVehicleDepartmentQuickSelect);
-    const vehicle = $("vehicleSelect"); const current = vehicle.value;
+    renderDispatchVehicleOptions();
+  }
+
+  function renderDispatchVehicleOptions() {
+    const vehicle = $("vehicleSelect");
+    if (!vehicle) return;
+    const current = vehicle.value;
     const dispatchVehicles = dispatchVehiclesFor(vehicleDepartmentQuickSelect);
-    vehicle.innerHTML = `<option value="">${t("请选择可调度车牌")}</option>` + dispatchVehicles.map((item) => `<option value="${escapeHtml(item.plate)}">${escapeHtml(item.plate)} · ${escapeHtml(item.modelDescription || t("车型未配置"))}</option>`).join("");
+    const loadingLabel = state.optionsLoading && !state.vehicles.length ? t("正在读取车辆…") : state.optionsError && !state.vehicles.length ? t("车辆选项读取失败，请重试") : t("请选择可调度车牌");
+    vehicle.innerHTML = `<option value="">${loadingLabel}</option>` + dispatchVehicles.map((item) => `<option value="${escapeHtml(item.plate)}">${escapeHtml(item.plate)} · ${escapeHtml(item.modelDescription || t("车型未配置"))}</option>`).join("");
     if (dispatchVehicles.some((item) => item.plate === current)) vehicle.value = current;
-    const bookingVehicle = $("bookingVehicleSelect"); const bookingCurrent = bookingVehicle.value;
+    const bookingVehicle = $("bookingVehicleSelect"); if (!bookingVehicle) return; const bookingCurrent = bookingVehicle.value;
     const bookingDispatchVehicles = dispatchVehiclesFor(bookingVehicleDepartmentQuickSelect);
-    bookingVehicle.innerHTML = `<option value="">${t("请选择可调度车牌")}</option>` + bookingDispatchVehicles.map((item) => `<option value="${escapeHtml(item.plate)}">${escapeHtml(item.plate)} · ${escapeHtml(item.modelDescription || t("车型未配置"))}</option>`).join("");
+    bookingVehicle.innerHTML = `<option value="">${loadingLabel}</option>` + bookingDispatchVehicles.map((item) => `<option value="${escapeHtml(item.plate)}">${escapeHtml(item.plate)} · ${escapeHtml(item.modelDescription || t("车型未配置"))}</option>`).join("");
     if (bookingDispatchVehicles.some((item) => item.plate === bookingCurrent)) bookingVehicle.value = bookingCurrent;
     updateVehicleReadout();
     updateBookingReadout();
@@ -1366,7 +1483,8 @@
   function vehicleOptionChip(option) {
     const value = String(option ?? "");
     const deleteLabel = state.language === "en" ? `Delete option ${value}` : `删除选项 ${value}`;
-    return `<span class="vehicle-option-chip" data-option-chip="${escapeHtml(value)}"><span>${escapeHtml(value)}</span><button type="button" data-option-remove="true" aria-label="${escapeHtml(deleteLabel)}" title="${escapeHtml(deleteLabel)}"><span aria-hidden="true">×</span></button></span>`;
+    const editLabel = state.language === "en" ? `Edit option ${value}` : `编辑选项 ${value}`;
+    return `<span class="vehicle-option-chip" data-option-chip="${escapeHtml(value)}"><input class="vehicle-option-edit-input" data-option-edit="true" value="${escapeHtml(value)}" aria-label="${escapeHtml(editLabel)}" title="${escapeHtml(editLabel)}" /><button type="button" data-option-remove="true" aria-label="${escapeHtml(deleteLabel)}" title="${escapeHtml(deleteLabel)}"><span aria-hidden="true">×</span></button></span>`;
   }
 
   function renderVehicleOptionDefinitions() {
@@ -1397,7 +1515,9 @@
 
   async function saveVehicleOption(tableId, fieldId) {
     const key = `${tableId}:${fieldId}`;
-    const chips = [...document.querySelectorAll(`[data-option-chips="${CSS.escape(key)}"] [data-option-chip]`)].map((chip) => chip.dataset.optionChip || "");
+    const chips = [...document.querySelectorAll(`[data-option-chips="${CSS.escape(key)}"] [data-option-chip]`)].map((chip) => chip.querySelector("[data-option-edit]")?.value || chip.dataset.optionChip || "").map(cleanDisplay).filter(Boolean);
+    const duplicate = chips.find((value, index) => chips.findIndex((item) => item.toLocaleLowerCase() === value.toLocaleLowerCase()) !== index);
+    if (duplicate) { setInlineStatus($("vehicleOptionsNotice"), `${t("选项不能重复：")}${duplicate}`, "error"); return; }
     if (!chips.length) { setInlineStatus($("vehicleOptionsNotice"), t("至少保留一个选项。"), "error"); return; }
     setInlineStatus($("vehicleOptionsNotice"), t("正在同步车辆字段选项…"));
     try {
@@ -1413,11 +1533,31 @@
     }
   }
 
+  async function fetchOptionPayload(endpoint) {
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await fetch(endpoint, { headers: headers() });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        return payload;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 350 * (attempt + 1)));
+      }
+    }
+    throw lastError || new Error("request failed");
+  }
+
   async function loadOptions() {
+    if (state.optionsLoading) return;
+    state.optionsLoading = true;
+    state.optionsError = "";
+    renderDispatchVehicleOptions();
     setNotice("正在读取人员、车辆和门店选项…");
     const resources = [
       ["users", "/api/options/users", "人员"],
-      ["vehicles", "/api/options/vehicles", "车辆"],
+      ["vehicles", isMobile ? "/api/options/vehicles?compact=1" : "/api/options/vehicles", "车辆"],
       ["stores", "/api/options/stores", "门店"]
     ];
     if (!isMobile) {
@@ -1425,23 +1565,47 @@
       if (userCan("manage_vehicles")) resources.push(["vehicleFieldDefinitions", "/api/admin/vehicle-field-options", "车辆选项定义"]);
     }
     const errors = [];
-    await Promise.all(resources.map(async ([key, endpoint, label]) => {
+    const loadResource = async ([key, endpoint, label]) => {
       try {
-        const response = await fetch(endpoint, { headers: headers() });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        const payload = await fetchOptionPayload(endpoint);
         state[key] = key === "vehicleFieldOptions" ? (payload.options || {}) : key === "vehicleFieldDefinitions" ? { tables: payload.tables || [] } : (payload[key] || []);
         saveOptionsCache();
-        renderOptions(); renderVehicleDepartmentFilter(); renderVehicles(); renderRows(); renderHistory(); renderTrackerHistoryVehicleOptions();
-        renderVehicleEditorOptions();
-        renderVehicleOptionDefinitions();
+        if (isMobile && key === "vehicles") {
+          // Paint the small, usable vehicle selector before rendering the
+          // large directory and desktop-only vehicle panels.
+          renderDispatchVehicleOptions();
+          window.setTimeout(() => renderOptions(), 0);
+        } else {
+          renderOptions();
+        }
+        if (!isMobile) {
+          renderVehicleDepartmentFilter(); renderVehicles(); renderRows(); renderHistory(); renderTrackerHistoryVehicleOptions();
+          renderVehicleEditorOptions();
+          renderVehicleOptionDefinitions();
+        }
       } catch (error) {
         errors.push(`${label}：${error.message}`);
+        if (key === "vehicles") state.optionsError = error.message;
+        renderDispatchVehicleOptions();
         renderOptions();
       }
-    }));
-    if (errors.length) setNotice(`部分选项读取失败：${errors.join("；")}`, "warning");
-    else setNotice("人员、车辆和门店选项已就绪。", "success");
+    };
+    try {
+      const vehicleResource = resources.find(([key]) => key === "vehicles");
+      if (isMobile && vehicleResource) {
+        // The vehicle selector is the first interactive control on mobile.
+        // Resolve it before the large directory response and its DOM work.
+        await loadResource(vehicleResource);
+        await Promise.all(resources.filter((resource) => resource !== vehicleResource).map(loadResource));
+      } else {
+        await Promise.all(resources.map(loadResource));
+      }
+      if (errors.length) setNotice(`部分选项读取失败：${errors.join("；")}`, "warning");
+      else setNotice("人员、车辆和门店选项已就绪。", "success");
+    } finally {
+      state.optionsLoading = false;
+      renderDispatchVehicleOptions();
+    }
   }
 
   async function loadTasks() {
@@ -1457,12 +1621,13 @@
   }
 
   async function loadNotificationSettings() {
-    if (!userCan("manage_accounts")) return;
+    if (!userCan("manage_notifications")) return;
     try {
       const response = await fetch("/api/admin/notification-settings", { headers: headers() });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
       state.notificationSettings = payload.departments || [];
+      if (payload.reminders && typeof payload.reminders === "object") state.notificationReminders = payload.reminders;
       renderNotificationSettings();
     } catch (error) {
       setInlineStatus($("notificationSettingsNotice"), `通知设置读取失败：${error.message}`, "error");
@@ -1546,8 +1711,8 @@
   }
   */
 
-  const notificationStages = [["departure", "出发通知"], ["return", "返程通知"], ["booking", "预约通知"]];
-  const notificationStageKey = { departure: "departureTargets", return: "returnTargets", booking: "bookingTargets" };
+  const notificationStages = [["departure", "出发通知"], ["return", "返程通知"], ["booking", "预约通知"], ["maintenance", "保养提醒"], ["inspection", "年检提醒"]];
+  const notificationStageKey = { departure: "departureTargets", return: "returnTargets", booking: "bookingTargets", maintenance: "maintenanceTargets", inspection: "inspectionTargets" };
 
   function notificationRule(department) {
     return state.notificationSettings.find((rule) => rule.department === department);
@@ -1564,14 +1729,20 @@
 
   function renderNotificationSettings() {
     if (!notificationSettingsContent) return;
-    if (!state.notificationSettings.length) { notificationSettingsContent.innerHTML = `<div class="empty-card">暂无通知设置。</div>`; return; }
-    notificationSettingsContent.innerHTML = state.notificationSettings.map((rule) => {
+    const reminder = (kind, label) => {
+      const rule = state.notificationReminders[kind] || {};
+      const mileage = kind === "maintenance" ? `<label>提前公里数<input type="number" min="0" max="1000000" step="100" data-reminder-field="${kind}.mileageBefore" value="${escapeHtml(rule.mileageBefore ?? 1000)}" /></label>` : "";
+      return `<div class="notification-reminder-rule"><div class="notification-reminder-title"><strong>${label}</strong><label class="notification-toggle"><input type="checkbox" data-reminder-field="${kind}.enabled" ${rule.enabled !== false ? "checked" : ""} /><span>启用</span></label></div><label>提前天数<input type="number" min="0" max="3650" step="1" data-reminder-field="${kind}.daysBefore" value="${escapeHtml(rule.daysBefore ?? 30)}" /></label>${mileage}<label>发送间隔（小时）<input type="number" min="1" max="8760" step="1" data-reminder-field="${kind}.frequencyHours" value="${escapeHtml(rule.frequencyHours ?? 24)}" /></label><label>最多发送次数<input type="number" min="1" max="100" step="1" data-reminder-field="${kind}.maxSends" value="${escapeHtml(rule.maxSends ?? 3)}" /></label></div>`;
+    };
+    const reminderSettings = `<section class="notification-reminder-settings"><div class="notification-department-heading"><div><h3>车辆提醒规则</h3><small>提醒会按车辆所属部门匹配联系人；没有单独设置时沿用预约通知目标。</small></div></div><div class="notification-reminder-grid">${reminder("maintenance", "保养临近")}${reminder("inspection", "年检临近")}</div></section>`;
+    if (!state.notificationSettings.length) { notificationSettingsContent.innerHTML = `${reminderSettings}<div class="empty-card">暂无通知设置。</div>`; return; }
+    notificationSettingsContent.innerHTML = `${reminderSettings}${state.notificationSettings.map((rule) => {
       const label = rule.department === "default" ? "默认通知（未匹配部门时使用）" : ({ administration: "行政部", maintenance: "维护部", operations: "运营部", procurement: "采购部", warehouse: "仓库部", store: "门店部", tophida: "Tophida" }[rule.department] || rule.department);
       return `<section class="notification-department"><div class="notification-department-heading"><h3>${escapeHtml(label)}</h3><small>${rule.department === "default" ? "未匹配部门时使用" : "按车辆所属部门匹配"}</small></div><div class="notification-stage-grid">${notificationStages.map(([stage, stageLabel]) => {
         const targets = rule[notificationStageKey[stage]] || [];
         return `<div class="notification-stage"><strong>${stageLabel}</strong><div class="notification-targets">${targets.length ? targets.map((target) => renderNotificationTarget(target, rule.department, stage)).join("") : `<span class="notification-empty">未设置</span>`}</div><div class="notification-add-row"><select data-notify-user="${escapeHtml(rule.department)}" data-notify-stage="${escapeHtml(stage)}">${notificationUserOptions("")}</select><button type="button" class="button button-quiet" data-notify-add-user="true" data-notify-department="${escapeHtml(rule.department)}" data-notify-stage="${escapeHtml(stage)}">添加联系人</button></div><div class="notification-add-row"><input data-notify-chat="${escapeHtml(rule.department)}" data-notify-stage="${escapeHtml(stage)}" placeholder="群聊 ID，例如 oc_xxx" /><button type="button" class="button button-quiet" data-notify-add-chat="true" data-notify-department="${escapeHtml(rule.department)}" data-notify-stage="${escapeHtml(stage)}">添加群聊</button></div></div>`;
       }).join("")}</div></section>`;
-    }).join("");
+    }).join("")}`;
   }
 
   function addNotificationTarget(department, stage, target) {
@@ -1595,10 +1766,11 @@
   async function saveNotificationSettings() {
     setInlineStatus($("notificationSettingsNotice"), "正在保存通知设置…");
     try {
-      const response = await fetch("/api/admin/notification-settings", { method: "PUT", headers: headers(), body: JSON.stringify({ departments: state.notificationSettings }) });
+      const response = await fetch("/api/admin/notification-settings", { method: "PUT", headers: headers(), body: JSON.stringify({ departments: state.notificationSettings, reminders: state.notificationReminders }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
       state.notificationSettings = payload.departments || state.notificationSettings;
+      state.notificationReminders = payload.reminders || state.notificationReminders;
       renderNotificationSettings();
       setInlineStatus($("notificationSettingsNotice"), "通知设置已保存。", "success");
     } catch (error) { setInlineStatus($("notificationSettingsNotice"), `通知设置保存失败：${error.message}`, "error"); }
@@ -1751,8 +1923,10 @@
   }
 
   function localizeEditorChrome() {
-    $("formTitle").textContent = state.editingRecordId ? `${t("编辑任务")} ${form.elements.taskNumber.value || ""}` : t(view === "departure" ? "出发登记" : isTransferView ? "中转登记" : "新建调度");
-    $("formSubmitButton").textContent = t(state.editingRecordId ? "保存修改" : view === "departure" ? "提交出发登记" : isTransferView ? "提交中转登记" : "创建调度任务");
+    const currentFlow = state.mobileFlow || view;
+    $("formTitle").textContent = state.editingRecordId ? `${t("编辑任务")} ${form.elements.taskNumber.value || ""}` : t(currentFlow === "departure" ? "出发登记" : currentFlow === "transfer" ? "中转登记" : "新建调度");
+    $("formSubmitButton").textContent = t(state.editingRecordId ? "保存修改" : currentFlow === "departure" ? "提交出发登记" : currentFlow === "transfer" ? "提交中转登记" : "创建调度任务");
+    if (isMobile) $("backToOverviewButton").textContent = t(currentFlow === "return" ? "返回选择返程任务" : currentFlow === "transfer" ? "返回选择中转任务" : "返回选择操作");
   }
 
   function ensureOption(select, value, label) {
@@ -1761,6 +1935,8 @@
   }
 
   function openEditor(task = null, preferredPlate = "") {
+    if (isMobile && !task) state.mobileFlow = "departure";
+    document.body.classList.remove("return-mode");
     document.body.classList.add("editor-mode"); resetEditor();
     if (task) {
       state.editingRecordId = task.recordId;
@@ -1798,14 +1974,18 @@
   }
 
   function openReturn(task) {
+    state.mobileFlow = "return";
     openEditor(task); $("returnSection").hidden = false;
+    localizeEditorChrome();
     $("returnSection").scrollIntoView({ behavior: contextualScrollBehavior(), block: "start" });
     history.replaceState(null, "", `?view=return&record=${encodeURIComponent(task.recordId)}`);
   }
 
   function openTransfer(task) {
     if (!task) { showTransferPicker(); return; }
+    state.mobileFlow = "transfer";
     openEditor(task);
+    localizeEditorChrome();
     form.hidden = true;
     $("returnSection").hidden = true;
     $("transferSection").hidden = false;
@@ -1817,6 +1997,25 @@
     setInlineStatus(transferNotice, "");
     $("transferSection").scrollIntoView({ behavior: contextualScrollBehavior(), block: "start" });
     history.replaceState(null, "", `?view=transfer&record=${encodeURIComponent(task.recordId)}`);
+  }
+
+  function navigateMobileFlow(next) {
+    if (!isMobile) return false;
+    history.pushState(null, "", `?view=${encodeURIComponent(next)}`);
+    if (next === "departure") openEditor();
+    else if (next === "return") showReturnPicker();
+    else if (next === "transfer") showTransferPicker();
+    else showMobileHome();
+    return true;
+  }
+
+  function backFromTaskEditor() {
+    if (isMobile) {
+      if (state.mobileFlow === "return") return navigateMobileFlow("return");
+      if (state.mobileFlow === "transfer") return navigateMobileFlow("transfer");
+      return showOverview();
+    }
+    return showOverview();
   }
 
   function renderExistingPhotos(task, phase) {
@@ -1919,19 +2118,37 @@
 
   async function saveTask(event) {
     event.preventDefault();
+    const submitButton = $("formSubmitButton");
+    if (submitButton?.disabled) return;
     matchRequesterInput("requesterInput", "requesterSelect", "requesterMatchStatus");
     const data = new FormData(form); const editing = Boolean(state.editingRecordId); const fields = fieldsFromForm(data);
     if (!validatePhotoSet("departure", !editing)) return;
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.dataset.originalLabel = submitButton.textContent || "";
+    }
+    setNotice(editing ? "正在保存调度记录…" : "正在创建调度记录…");
     try {
       const response = await fetch(editing ? `/api/tasks/${encodeURIComponent(state.editingRecordId)}` : "/api/tasks", { method: editing ? "PATCH" : "POST", headers: headers(), body: JSON.stringify(editing ? { fields } : { fields, clientToken: crypto.randomUUID() }) });
       const payload = await response.json(); if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
       const recordId = payload.recordId; let photoMessage = "";
-      if (photoPayloads("departure").length) { const photoResult = await uploadDeparturePhotos(recordId); photoMessage = ` 已上传出发照片 ${photoResult.uploaded} 张。`; if (photoResult.notification?.sent) photoMessage += ` 已通知 ${photoResult.notification.sent} 个 Lark 目标。`; }
+      if (photoPayloads("departure").length) {
+        setNotice(`调度记录已创建，正在后台上传 ${photoPayloads("departure").length} 张出发照片…`);
+        const photoResult = await uploadDeparturePhotos(recordId);
+        photoMessage = ` 已上传出发照片 ${photoResult.uploaded} 张。`;
+        if (photoResult.notification?.sent) photoMessage += ` 已通知 ${photoResult.notification.sent} 个 Lark 目标。`;
+      }
       const syncMessage = payload.vehicleSync?.message ? ` ${payload.vehicleSync.message}` : "";
       clearFormDirty();
       if (isMobile) { window.location.href = "?view=apply"; return; }
       resetEditor(); showOverview(); await Promise.all([loadTasks(), loadOptions()]); setNotice(editing ? `任务已更新。${photoMessage}${syncMessage}` : `任务已创建：${recordId}。${photoMessage}${syncMessage}`, "success");
     } catch (error) { setNotice(`保存失败：${error.message}`, "error"); }
+    finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = submitButton.dataset.originalLabel || submitButton.textContent;
+      }
+    }
   }
 
   async function submitReturn() {
@@ -1947,7 +2164,9 @@
       const payload = await response.json(); if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
       const notificationMessage = payload.notification?.sent ? ` 已通知 ${payload.notification.sent} 个 Lark 目标。` : "";
       clearFormDirty();
-      setInlineStatus($("returnNotice"), `返程登记已完成。已上传 ${payload.photoResult?.uploaded || 0} 张照片。${notificationMessage}${payload.vehicleSync?.message || ""}`, "success"); await Promise.all([loadTasks(), loadOptions()]);
+      setInlineStatus($("returnNotice"), `返程登记已完成。已上传 ${payload.photoResult?.uploaded || 0} 张照片。${notificationMessage}${payload.vehicleSync?.message || ""}`, "success");
+      if (isMobile) { window.location.href = "?view=apply"; return; }
+      await Promise.all([loadTasks(), loadOptions()]);
     } catch (error) { setInlineStatus($("returnNotice"), `返程登记失败：${error.message}`, "error"); }
   }
 
@@ -1962,7 +2181,7 @@
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
       if (isMobile) {
-        window.location.href = `?view=return&record=${encodeURIComponent(state.editingRecordId)}`;
+        window.location.href = "?view=apply";
         return;
       }
       clearFormDirty(); resetEditor(); showOverview(); await loadTasks(); setNotice("中转登记已保存，返程起点已贯通。", "success");
@@ -2033,9 +2252,9 @@
     const trackerMatch = state.trackerStatus ? trackerMatchForVehicle(vehicle) : null;
     const completeness = missing.length ? `<p class="vehicle-completeness incomplete">${t("待补全")} ${missing.length} ${state.language === "en" ? "fields: " : "项："}${escapeHtml(missing.map(t).join(state.language === "en" ? ", " : "、"))}</p>` : `<p class="vehicle-completeness complete">${t("车辆资料完整，可用于调度与保养提醒。")}</p>`;
     $("vehicleDetailContent").innerHTML = `<div class="vehicle-detail-hero"><div class="vehicle-detail-photo">${photo}</div><div class="vehicle-detail-summary"><p class="eyebrow">${escapeHtml(vehicle.owner || t("未设置部门 / 门店"))}</p><h3>${escapeHtml(vehicle.modelDescription || t("车型未配置"))}</h3><p class="vehicle-detail-plate">${escapeHtml(vehicle.plate || t("未填写车牌"))}</p><div class="vehicle-detail-badges"><span class="badge ${vehicle.dispatchEligible ? "status-running" : "status-cancelled"}">${escapeHtml(status)}</span>${reminderBadge(maintenance)}${reminderBadge(inspection)}</div>${completeness}</div></div><div class="vehicle-detail-grid"><section class="vehicle-detail-section"><h3>${t("车辆信息")}</h3><div class="vehicle-detail-items">${vehicleDetailItem("车辆品牌", vehicle.brand)}${vehicleDetailItem("车型", vehicle.model)}${vehicleDetailItem("车辆类型", vehicle.vehicleType)}${vehicleDetailItem("车辆状态", vehicle.status)}${vehicleDetailItem("所属门店 / 部门", vehicle.owner)}${vehicleDetailItem("年份", vehicle.year)}</div></section><section class="vehicle-detail-section"><h3>${t("里程与保养")}</h3><div class="vehicle-detail-items">${vehicleDetailItem("当前公里数", vehicle.currentMileageField ? formatMileage(vehicle.mileage) : "", Boolean(vehicle.currentMileageField))}${vehicleDetailItem("下次保养公里数", vehicle.nextMaintenanceMileageField ? formatMileage(vehicle.nextMaintenanceMileage) : "", Boolean(vehicle.nextMaintenanceMileageField))}${vehicleDetailItem("下次保养日期", vehicle.nextMaintenanceDate, Boolean(vehicle.nextMaintenanceDateField))}${vehicleDetailItem("保养状态", maintenance.text)}${vehicleDetailItem("上次保养日期", vehicle.lastServiceDate, Boolean(vehicle.lastServiceDateField))}${vehicleDetailItem("服务提供商", vehicle.serviceProvider, Boolean(vehicle.serviceProviderField))}</div></section><section class="vehicle-detail-section"><h3>${t("大本资料")}</h3><div class="vehicle-detail-items">${vehicleDetailItem("注册地点", vehicle.registeringAuthority, Boolean(vehicle.registeringAuthorityField))}${vehicleDetailItem("注册号", vehicle.registerNumber, Boolean(vehicle.registerNumberField))}${vehicleDetailItem("车辆 ID / VIN", vehicle.vehicleIdentificationNumber, Boolean(vehicle.vehicleIdentificationNumberField))}${vehicleDetailItem("年检到期日期", vehicle.certificateExpiry, Boolean(vehicle.certificateExpiryField))}${vehicleDetailItem("年检状态", inspection.text, Boolean(vehicle.certificateExpiryField))}${vehicleLogBookItem(vehicle)}</div></section><section class="vehicle-detail-section"><h3>${t("保险与配套")}</h3><div class="vehicle-detail-items">${vehicleDetailItem("保单号", vehicle.policyNumber, Boolean(vehicle.policyNumberField))}${vehicleDetailItem("保险信息", vehicle.insurance, Boolean(vehicle.insuranceField))}${vehicleDetailItem("加油油卡号", vehicle.fnbFleetCard, Boolean(vehicle.fnbFleetCardField))}${vehicleDetailItem("备用钥匙", vehicle.spareKey, Boolean(vehicle.spareKeyField))}${vehicleDetailPhotoItem("加油油卡图片", vehicle.fleetCardPhotoUrl, Boolean(vehicle.fleetCardPhotoField))}</div></section></div>`;
-    const trackerContent = `<div><p class="eyebrow">TRACKER</p><h3>${t("车辆位置状态")}</h3><p>${escapeHtml(t("位置、里程与数据时间在独立菜单中显示。"))}</p><div class="vehicle-detail-badges">${state.trackerStatus ? `${trackerBadge(trackerMatch)}${trackerActualStateBadge(trackerMatch)}` : ""}</div></div>`;
+    const trackerContent = `<div><p class="eyebrow">TRACKER</p><h3>${t("车辆位置状态")}</h3><p>${escapeHtml(t("位置、里程与数据时间在独立菜单中显示。"))}</p><div class="vehicle-detail-badges">${state.trackerStatus ? trackerBadge(trackerMatch) : ""}</div></div>`;
     $("vehicleDetailContent").insertAdjacentHTML("beforeend", `<section class="vehicle-tracker-panel">${trackerContent}<button class="button button-primary" type="button" data-tracker-table="${escapeHtml(vehicle.tableId)}" data-tracker-record="${escapeHtml(vehicle.recordId)}">${t("查看位置状态")}</button></section>`);
-    $("vehicleMaintenancePanel").hidden = !userCan("manage_vehicles");
+    $("vehicleMaintenancePanel").hidden = !userCan("manage_maintenance");
     renderMaintenanceHistory();
   }
 
@@ -2089,7 +2308,7 @@
     document.body.classList.remove("editor-mode");
     renderVehicleDetail(vehicle); showOnly("vehicleDetail");
     setVehicleRoute("vehicle", tableId, recordId, updateHistory);
-    if (userCan("manage_vehicles")) void loadMaintenance(vehicle);
+    if (userCan("manage_maintenance")) void loadMaintenance(vehicle);
   }
 
   function openVehicleEditor(tableId, recordId, updateHistory = true) {
@@ -2297,9 +2516,23 @@
   $("syncButton").addEventListener("click", syncNow);
   $("logoutButton").addEventListener("click", logout);
   $("mobileLogoutButton")?.addEventListener("click", logout);
+  if (isMobile) {
+    document.querySelectorAll("a.mobile-action").forEach((link) => link.addEventListener("click", (event) => {
+      const target = new URL(link.href, window.location.href).searchParams.get("view");
+      if (["departure", "transfer", "return"].includes(target)) {
+        event.preventDefault();
+        navigateMobileFlow(target);
+      }
+    }));
+    document.querySelectorAll('a[href="?view=apply"]').forEach((link) => link.addEventListener("click", (event) => {
+      event.preventDefault();
+      history.pushState(null, "", "?view=apply");
+      showMobileHome();
+    }));
+  }
   $("newTaskButton").addEventListener("click", () => openEditor());
   $("addSoldVehicleButton").addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); openSoldVehicleCreator(); });
-  $("backToOverviewButton").addEventListener("click", showOverview);
+  $("backToOverviewButton").addEventListener("click", backFromTaskEditor);
   $("backFromVehicleButton").addEventListener("click", () => { if (state.editingVehicle) openVehicleDetail(state.editingVehicle.tableId, state.editingVehicle.recordId); else showOverview(); });
   $("backFromVehicleDetailButton").addEventListener("click", showOverview);
   $("saveNotificationSettingsButton").addEventListener("click", saveNotificationSettings);
@@ -2327,7 +2560,7 @@
       const key = `${add.dataset.tableId}:${add.dataset.fieldId}`;
       const input = document.querySelector(`input[data-option-input="${CSS.escape(key)}"]`);
       const value = input?.value.trim() || "";
-      const chips = [...document.querySelectorAll(`[data-option-chips="${CSS.escape(key)}"] [data-option-chip]`)].map((chip) => chip.dataset.optionChip || "");
+      const chips = [...document.querySelectorAll(`[data-option-chips="${CSS.escape(key)}"] [data-option-chip]`)].map((chip) => chip.querySelector("[data-option-edit]")?.value || chip.dataset.optionChip || "");
       if (!value) return;
       if (chips.some((chip) => chip.trim().toLowerCase() === value.toLowerCase())) { setInlineStatus($("vehicleOptionsNotice"), t("选项已存在。"), "error"); return; }
       const container = document.querySelector(`[data-option-chips="${CSS.escape(key)}"]`);
@@ -2345,13 +2578,14 @@
   $("cancelEditButton").addEventListener("click", () => { if (state.editingVehicle) openVehicleDetail(state.editingVehicle.tableId, state.editingVehicle.recordId); else showOverview(); });
   $("returnSubmitButton").addEventListener("click", submitReturn);
   $("vehicleSelect").addEventListener("change", updateVehicleReadout);
+  $("vehicleSelect").addEventListener("focus", () => { if (!state.vehicles.length && !state.optionsLoading) void loadOptions(); });
   $("bookingVehicleSelect").addEventListener("change", updateBookingReadout);
   requesterInput?.addEventListener("input", () => matchRequesterInput("requesterInput", "requesterSelect", "requesterMatchStatus"));
   bookingRequesterInput?.addEventListener("input", () => matchRequesterInput("bookingRequesterInput", "bookingRequesterSelect", "bookingRequesterMatchStatus"));
   $("requesterSelect").addEventListener("change", () => { syncRequesterInput("requesterSelect", "requesterInput"); updateRequesterMatchStatus("requesterInput", "requesterSelect", "requesterMatchStatus"); });
   $("bookingRequesterSelect").addEventListener("change", () => { syncRequesterInput("bookingRequesterSelect", "bookingRequesterInput"); updateRequesterMatchStatus("bookingRequesterInput", "bookingRequesterSelect", "bookingRequesterMatchStatus"); });
-  vehicleDepartmentQuickSelect?.addEventListener("change", () => { vehicleDepartmentQuickSelect.dataset.departmentTouched = "true"; renderOptions(); updateVehicleReadout(); });
-  bookingVehicleDepartmentQuickSelect?.addEventListener("change", () => { bookingVehicleDepartmentQuickSelect.dataset.departmentTouched = "true"; renderOptions(); updateBookingReadout(); });
+  vehicleDepartmentQuickSelect?.addEventListener("change", () => { vehicleDepartmentQuickSelect.dataset.departmentTouched = "true"; renderDispatchVehicleOptions(); updateVehicleReadout(); });
+  bookingVehicleDepartmentQuickSelect?.addEventListener("change", () => { bookingVehicleDepartmentQuickSelect.dataset.departmentTouched = "true"; renderDispatchVehicleOptions(); updateBookingReadout(); });
   [["originQuickSelect", "originInput"], ["destinationQuickSelect", "destinationInput"]].forEach(([selectId, inputId]) => $(selectId).addEventListener("change", () => { if ($(selectId).value) $(inputId).value = $(selectId).value; }));
   [["bookingOriginQuickSelect", "bookingOriginInput"], ["bookingDestinationQuickSelect", "bookingDestinationInput"]].forEach(([selectId, inputId]) => $(selectId).addEventListener("change", () => { if ($(selectId).value) $(inputId).value = $(selectId).value; }));
   [["returnOriginQuickSelect", "returnOriginInput"], ["returnDestinationQuickSelect", "returnDestinationInput"], ["transferLocationQuickSelect", "transferLocationInput"]].forEach(([selectId, inputId]) => $(selectId)?.addEventListener("change", () => { if ($(selectId).value) $(inputId).value = $(selectId).value; }));
@@ -2366,7 +2600,7 @@
   vehicleForm.addEventListener("submit", saveVehicle);
   maintenanceForm?.addEventListener("submit", saveMaintenance);
   bookingForm.addEventListener("submit", saveBooking);
-  $("languageToggle").addEventListener("click", () => { state.language = state.language === "zh" ? "en" : "zh"; sessionStorage.setItem("dispatch_language", state.language); applyLanguage(); window.dispatchEvent(new Event("dispatch:language")); });
+  $("languageToggle").addEventListener("click", () => { state.language = state.language === "zh" ? "en" : "zh"; sessionStorage.setItem("dispatch_language_override_v2", state.language); applyLanguage(); window.dispatchEvent(new Event("dispatch:language")); });
   searchInput?.addEventListener("input", () => { updateQueryState({ taskSearch: searchInput.value.trim() }); renderRows(); });
   statusFilter?.addEventListener("change", () => { state.quickStatusFilter = ""; updateQueryState({ taskStatus: statusFilter.value }); renderRows(); });
   vehicleDepartmentFilter?.addEventListener("change", renderVehicles);
@@ -2419,6 +2653,21 @@
       if (input) input.value = "";
     }
   });
+  notificationSettingsContent?.addEventListener("change", (event) => {
+    const field = event.target.closest("[data-reminder-field]");
+    if (!field) return;
+    const [kind, name] = String(field.dataset.reminderField || "").split(".");
+    if (!state.notificationReminders[kind]) return;
+    if (name === "enabled") state.notificationReminders[kind].enabled = Boolean(field.checked);
+    else {
+      const value = Number(field.value);
+      if (!Number.isFinite(value)) return;
+      const limits = { daysBefore: [0, 3650], mileageBefore: [0, 1000000], frequencyHours: [1, 8760], maxSends: [1, 100] }[name];
+      if (!limits) return;
+      state.notificationReminders[kind][name] = Math.min(limits[1], Math.max(limits[0], Math.round(value)));
+      field.value = state.notificationReminders[kind][name];
+    }
+  });
   function handleVehicleCardClick(event) {
     const dispatch = event.target.closest("button[data-new-plate]");
     const edit = event.target.closest("button[data-vehicle-record]");
@@ -2463,11 +2712,9 @@
   trackerVehicleDialog?.addEventListener("close", () => { state.trackerVehicleKey = ""; updateQueryState({ tracker: "" }); });
 
   restoreFilterState(); restoreTrackerHistoryFilters(); setDefaultDeparture(); applyLanguage();
+  setAppLoading("正在加载车辆调度", "正在确认登录状态…");
   if (view === "overview") showOverview(); else if (view === "apply") showMobileHome(); else if (view === "return" && !params.get("record")) showReturnPicker(); else if (view === "transfer" && !params.get("record")) showTransferPicker(); else if (view === "departure") openEditor(); else if (view === "booking") openBooking(); else if (view === "history") openHistory(); else if (view === "tracker-history") openTrackerHistory(params.get("trackerVehicle") || "", false, false); else if (view === "settings") openSettings(); else if (view === "vehicle-options") openVehicleOptions();
-  loadCurrentUser().then(async (signedIn) => {
-    if (!signedIn) return;
-    await Promise.all([loadOptions(), loadTasks(), loadNotificationSettings(), loadPhotoSyncStatus(), loadTrackerStatus()]);
-    window.setInterval(() => { void loadTrackerStatus(); }, 60_000);
+  async function openRequestedView() {
     if (view === "return" && params.get("record")) { const task = state.tasks.find((item) => item.recordId === params.get("record")); if (task) openReturn(task); else showReturnPicker(); }
     else if (view === "transfer" && params.get("record")) { const task = state.tasks.find((item) => item.recordId === params.get("record")); if (task) openTransfer(task); else showTransferPicker(); }
     else if (view === "edit" && params.get("record")) { const task = state.tasks.find((item) => item.recordId === params.get("record")); if (task) openEditor(task); }
@@ -2484,5 +2731,35 @@
     const trackerTarget = params.get("tracker") || "";
     const separator = trackerTarget.indexOf(":");
     if (separator > 0) openTrackerVehicle(trackerTarget.slice(0, separator), trackerTarget.slice(separator + 1), false);
-  }).catch((error) => setNotice(`加载应用失败：${error.message}`, "error"));
+  }
+
+  loadCurrentUser().then(async (signedIn) => {
+    if (!signedIn) return;
+    setAppLoading("正在加载车辆调度", "正在读取账户权限…");
+    // Hydrate the signed-in user's cache before any remote option request.
+    loadOptionsCache();
+    setAppLoading("正在加载车辆调度", "正在读取车辆和任务数据…");
+    const tasksPromise = loadTasks();
+    const optionsPromise = loadOptions();
+    void Promise.all([loadNotificationSettings(), loadPhotoSyncStatus(), loadTrackerStatus()]);
+    window.setInterval(() => { void loadTrackerStatus(); }, 60_000);
+    // Do not reveal a mobile workflow until its vehicle/task choices are
+    // usable. This avoids a blank selector that looks like a stalled tap.
+    if (isMobile || params.get("record")) await Promise.all([tasksPromise, optionsPromise]);
+    setAppLoading("正在加载车辆调度", "正在打开目标页面…");
+    await openRequestedView();
+    hideAppLoading();
+  }).catch((error) => {
+    setAppLoading("加载失败", error.message || "请检查网络后重试");
+    setNotice(`加载应用失败：${error.message}`, "error");
+  });
+
+  // Cover the current shell while a full navigation is waiting on the
+  // server. Restore it on bfcache return instead of leaving a stale overlay.
+  window.addEventListener("pagehide", () => {
+    if (appReady) showAppLoading();
+  });
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted && appReady) hideAppLoading();
+  });
 })();

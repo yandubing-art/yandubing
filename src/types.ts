@@ -120,6 +120,8 @@ export type VehicleProfile = {
   nextMaintenanceDateField: string;
   photoFieldConfigured: boolean;
   photoFullUrl?: string;
+  photoFileToken?: string;
+  fleetCardPhotoFileToken?: string;
 };
 
 export type VehicleMatchResult = {

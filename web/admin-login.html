@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f4f7fb" />
     <title>后台管理登录 · 车辆调度控制台</title>
-    <link rel="stylesheet" href="/styles.css?v=20260916-guideline-fixes-1" />
+    <link rel="stylesheet" href="/styles.css?v=20260921-vehicle-options-1" />
     <link rel="stylesheet" href="/valueco-day.css?v=20260915-vehicle-compliance-1" />
     <link rel="stylesheet" href="/valueco-refined.css?v=20260915-feihong-console-static-route-1" />
   </head>
@@ -16,7 +16,7 @@
         <div class="auth-intro-content">
           <p class="eyebrow">VALUECO · ADMINISTRATION</p>
           <h1>车辆调度后台管理</h1>
-          <p>在一个清晰的运营后台管理车辆总览、调度任务和账号权限，让车队状态始终可见。</p>
+          <p>在一个清晰的运营后台管理车辆总览、调度任务和账号权限；Lark 与独立账号都会按角色权限进入。</p>
           <div class="auth-brand-signal">
             <div><strong>FLEET</strong><span>车辆总览</span></div>
             <div><strong>OPS</strong><span>任务调度</span></div>
@@ -34,16 +34,19 @@
           <div class="auth-card-actions"><button id="adminLanguageToggle" class="language-toggle" type="button" aria-label="切换中英文">English</button><button id="adminThemeToggle" class="theme-toggle" type="button">自动模式</button></div>
         </div>
         <p id="adminLoginError" class="auth-message" role="alert"></p>
+        <a id="larkAdminLogin" class="button button-primary auth-lark-button" href="/api/auth/lark/start?admin=1&amp;next=%2F%3Fview%3Doverview">使用 Lark 账号登录后台</a>
+        <p id="larkAdminLoginHint" class="auth-login-hint" hidden>使用公司 Lark 账号登录；登录后仍会按照角色和权限决定能否进入后台管理。</p>
+        <div id="adminLoginDivider" class="auth-divider" hidden><span>或使用管理员独立账号</span></div>
         <form id="adminLoginForm" class="auth-form">
           <label><span>管理员账号</span><input id="adminUsername" name="username" type="text" autocomplete="username" required placeholder="输入管理员账号" /></label>
           <label><span>密码</span><input id="adminPassword" name="password" type="password" autocomplete="current-password" required placeholder="输入密码" /></label>
           <button class="button button-primary button-wide" type="submit">登录后台管理</button>
           <a class="button button-quiet button-wide" href="/login">返回移动调度登录</a>
         </form>
-        <p class="auth-note">请使用由系统管理员分配的管理员账号。Lark 账号和普通独立账号不能进入后台管理。</p>
+        <p class="auth-note">Lark 账号和独立账号都需要经过角色权限校验；进入权限管理需要 `manage_accounts` 权限。</p>
       </section>
     </main>
     <script src="/theme.js?v=20260916-guideline-fixes-1"></script>
-    <script src="/admin-login.js?v=20260913-auth-hierarchy-1" defer></script>
+    <script src="/admin-login.js?v=20260921-lark-admin-login-3" defer></script>
   </body>
 </html>

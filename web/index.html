@@ -5,11 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f4f7fb" />
     <title>Lark 车辆调度控制台</title>
-    <link rel="stylesheet" href="/styles.css?v=20260916-tracker-history-4" />
+    <script>
+      (function () {
+        document.documentElement.classList.add("app-booting");
+      }());
+    </script>
+    <style>
+      html.app-booting .shell { visibility: hidden; }
+    </style>
+    <link rel="stylesheet" href="/styles.css?v=20260921-tracker-ranges-1" />
     <link rel="stylesheet" href="/valueco-day.css?v=20260915-vehicle-compliance-1" />
     <link rel="stylesheet" href="/valueco-refined.css?v=20260915-feihong-console-static-route-1" />
   </head>
   <body>
+    <div id="appLoadingOverlay" class="app-loading-overlay is-visible" role="status" aria-live="polite" aria-atomic="true">
+      <div class="app-loading-spinner" aria-hidden="true"></div>
+      <strong id="appLoadingTitle">正在加载车辆调度</strong>
+      <small id="appLoadingDetail">正在确认登录状态…</small>
+    </div>
     <a class="skip-link" href="#mainContent">跳到主内容</a>
     <div class="shell">
       <header class="topbar">
@@ -23,7 +36,7 @@
         </div>
         <div class="top-actions">
           <div class="account-summary"><span id="accountName">当前用户</span><small id="accountRole">—</small></div>
-          <a id="accountManagementLink" class="button button-quiet" href="/accounts" hidden>账号管理</a>
+          <a id="accountManagementLink" class="button button-quiet" href="/permissions" hidden>权限管理</a>
           <a id="notificationSettingsLink" class="button button-quiet" href="?view=settings" hidden>通知设置</a>
           <a id="vehicleOptionsLink" class="button button-quiet" href="?view=vehicle-options" hidden>编辑车辆选项</a>
           <a id="viewSwitch" class="button button-quiet" href="?view=apply">手机调度</a>
@@ -62,7 +75,7 @@
           </article>
         </section>
 
-        <section id="statsView" class="stats-grid" aria-label="任务统计">
+        <section id="statsView" class="stats-grid" aria-label="任务统计" hidden>
           <article class="stat-card accent-blue" data-status="" role="button" tabindex="0"><span>全部任务</span><strong id="totalCount">—</strong><small>点击查看全部记录 · 当前调度表</small></article>
           <article class="stat-card accent-amber" data-status="待调度" role="button" tabindex="0"><span>待处理</span><strong id="pendingCount">—</strong><small>点击查看待调度记录 · 待调度 / 已排程</small></article>
           <article class="stat-card accent-violet" data-status="执行中" role="button" tabindex="0"><span>执行中</span><strong id="runningCount">—</strong><small>点击查看执行中记录 · 已发送到执行器</small></article>
@@ -70,7 +83,7 @@
           <article class="stat-card accent-red" data-status="失败" role="button" tabindex="0"><span>失败</span><strong id="failedCount">—</strong><small>点击查看失败记录 · 需要人工关注</small></article>
         </section>
 
-        <section id="overviewView" class="overview-view">
+        <section id="overviewView" class="overview-view" hidden>
           <article class="panel task-panel">
             <div class="panel-heading"><div><p class="eyebrow">DISPATCH TASKS</p><h2>调度任务</h2></div><div class="filters"><input id="searchInput" name="taskSearch" type="search" autocomplete="off" aria-label="搜索任务、地点、车辆、驾驶人" placeholder="搜索任务、地点、车辆、驾驶人" /><select id="statusFilter" name="taskStatus" aria-label="按状态筛选"><option value="">全部状态</option><option value="已预约">已预约</option><option value="待调度">待调度</option><option value="已排程">已排程</option><option value="执行中">执行中</option><option value="已完成">已完成</option><option value="失败">失败</option><option value="取消">取消</option></select></div></div>
             <div id="notice" class="notice" role="status">请输入后端令牌后连接。</div>
@@ -102,7 +115,7 @@
             <form id="bookingForm">
               <div class="form-grid"><label class="driver-field">驾驶人<input id="bookingRequesterInput" name="requesterSearch" list="bookingRequesterSuggestions" autocomplete="off" required placeholder="默认当前登录人，可改选其他人员" /><datalist id="bookingRequesterSuggestions"></datalist><select id="bookingRequesterSelect" class="driver-match-source" name="requesterId" tabindex="-1" aria-hidden="true"><option value="">请选择公司人员</option></select><small id="bookingRequesterMatchStatus" class="field-hint" aria-live="polite">默认当前登录人，可改选其他人员</small></label><label>预约出发时间<input id="bookingDepartureTime" name="departureTime" type="datetime-local" required /></label></div>
               <div class="form-row route-form-row"><label>起点<input id="bookingOriginInput" name="origin" required placeholder="可手动输入地点或选择门店" /><select id="bookingOriginQuickSelect" class="quick-select" aria-label="预约起点快速选择"><option value="">快速选择门店</option></select></label><label>目的地<input id="bookingDestinationInput" name="destination" required placeholder="可手动输入地点或选择门店" /><select id="bookingDestinationQuickSelect" class="quick-select" aria-label="预约目的地快速选择"><option value="">快速选择门店</option></select></label></div>
-              <div class="form-row vehicle-form-row"><label class="vehicle-field">预约车辆<select id="bookingVehicleDepartmentQuickSelect" class="quick-select" aria-label="按部门快速选择预约车辆"><option value="">按部门快速选择车辆</option></select><select id="bookingVehicleSelect" name="vehicle" required><option value="">请选择可调度车牌</option></select><span id="bookingVehicleReadout" class="vehicle-readout">选择车牌后显示车型描述</span><small class="field-hint">默认匹配登录人部门，也可切换部门再选择车牌；仅显示可调度车辆。</small></label></div>
+              <div class="form-row vehicle-form-row"><label class="vehicle-field">预约车辆<select id="bookingVehicleDepartmentQuickSelect" class="quick-select" aria-label="按部门快速选择预约车辆"><option value="">按部门快速选择车辆</option></select><select id="bookingVehicleSelect" name="vehicle" required><option value="">请选择可调度车牌</option></select><span id="bookingVehicleReadout" class="vehicle-readout">选择车牌后显示车型描述</span><small class="field-hint">移动调度默认显示全部可调度车辆，也可按部门筛选；仅显示可调度车辆。</small></label></div>
               <button class="button button-primary button-wide" type="submit">提交车辆预约</button>
               <p id="bookingNotice" class="notice inline-notice" role="status"></p>
               <a id="bookingHistoryLink" class="button button-quiet button-wide" href="?view=history" hidden>查看出行记录</a>
@@ -133,7 +146,7 @@
               <label>每页<select id="trackerHistoryLimit"><option value="50">50 条</option><option value="100" selected>100 条</option><option value="250">250 条</option><option value="500">500 条</option></select></label>
               <div class="tracker-history-filter-actions"><button class="button button-primary" type="submit">查询记录</button><button id="trackerHistoryReset" class="button button-quiet" type="button">重置</button></div>
             </form>
-            <div class="tracker-history-quick" aria-label="快速时间范围"><span>快速范围</span><button type="button" data-tracker-range-hours="24">24 小时</button><button type="button" data-tracker-range-hours="168">7 天</button><button type="button" data-tracker-range-hours="720">30 天</button><button type="button" data-tracker-range-hours="2160">90 天</button></div>
+            <div class="tracker-history-quick" aria-label="快速时间范围"><span>快速范围</span><button type="button" data-tracker-range-hours="1">1 小时</button><button type="button" data-tracker-range-hours="2">2 小时</button><button type="button" data-tracker-range-hours="4">4 小时</button><button type="button" data-tracker-range-hours="6">6 小时</button><button type="button" data-tracker-range-hours="12">12 小时</button><button type="button" data-tracker-range-hours="24">24 小时</button><button type="button" data-tracker-range-hours="168">7 天</button><button type="button" data-tracker-range-hours="720">30 天</button><button type="button" data-tracker-range-hours="2160">90 天</button></div>
             <div class="tracker-history-summary-bar"><p id="trackerHistorySummary" class="notice inline-notice" role="status">请选择条件查询 Tracker 记录。</p><button id="trackerHistoryRouteButton" class="button button-primary" type="button" disabled>查看大概路线</button></div>
             <div id="trackerHistoryRouteSummary" class="tracker-history-route-summary" hidden></div>
             <div class="table-wrap tracker-history-table"><table><thead><tr><th>Tracker 时间</th><th>车辆</th><th>车辆实际状态</th><th>位置</th><th>里程</th><th>记录时间</th></tr></thead><tbody id="trackerHistoryRows"><tr><td colspan="6" class="empty">暂无查询结果。</td></tr></tbody></table></div>
@@ -151,11 +164,11 @@
 
         <section id="settingsView" class="editor-view settings-view" hidden>
           <article class="panel photo-sync-settings">
-            <div class="panel-heading editor-heading"><div><p class="eyebrow">LARK BASE MEDIA</p><h2>飞书照片同步</h2><p class="field-hint">以拥有车辆档案表权限的 Base 管理员完成一次授权。此后车辆图片会同步写入多维表格附件列；服务器原图仍保留作审计用途。</p></div><a id="photoSyncConnectButton" class="button button-primary" href="/api/admin/lark-photo-sync/start">连接飞书 Base 管理员</a></div>
+            <div class="panel-heading editor-heading"><div><p class="eyebrow">LARK BASE MEDIA</p><h2>飞书照片同步</h2><p class="field-hint">以拥有车辆档案表权限的 Base 管理员完成一次授权。此后车辆图片会同步写入多维表格附件列；服务器原图仍保留作审计用途。</p></div><div class="editor-heading-actions"><a class="button button-quiet" href="?view=overview">返回后台总览</a><a id="photoSyncConnectButton" class="button button-primary" href="/api/admin/lark-photo-sync/start">连接飞书 Base 管理员</a></div></div>
             <p id="photoSyncStatus" class="notice inline-notice" role="status">正在检查飞书照片同步状态…</p>
           </article>
           <article class="panel">
-            <div class="panel-heading editor-heading"><div><p class="eyebrow">ADMIN NOTIFICATIONS</p><h2>部门通知设置</h2><p class="field-hint">为每个部门分别配置出发、返程和车辆预约的 Lark 联系人或群聊。群聊请填写 `oc_…` 群 ID；机器人需要先加入群聊。</p></div><a class="button button-quiet" href="?view=overview">返回后台总览</a></div>
+            <div class="panel-heading editor-heading"><div><p class="eyebrow">ADMIN NOTIFICATIONS</p><h2>部门通知设置</h2><p class="field-hint">为每个部门配置出发、返程、预约、保养和年检提醒的 Lark 联系人或群聊，并设置提醒提前天数、发送频率和次数。群聊请填写 `oc_…` 群 ID；机器人需要先加入群聊。</p></div><a class="button button-quiet" href="?view=overview">返回后台总览</a></div>
             <div id="notificationSettingsContent" class="notification-settings-content"><div class="empty-card">正在加载通知设置…</div></div>
             <div class="settings-actions"><button id="saveNotificationSettingsButton" class="button button-primary" type="button">保存通知设置</button><p id="notificationSettingsNotice" class="notice inline-notice" role="status"></p></div>
           </article>
@@ -167,7 +180,7 @@
             <form id="taskForm">
               <div class="form-grid"><label>任务编号<input id="taskNumberInput" name="taskNumber" readonly placeholder="提交后由多维表格自动生成" /><small class="field-hint">任务编号由多维表格自动生成</small></label><label class="driver-field">驾驶人<input id="requesterInput" list="requesterSuggestions" autocomplete="off" required placeholder="默认当前登录人，可改选其他人员" /><datalist id="requesterSuggestions"></datalist><select id="requesterSelect" class="driver-match-source" name="requesterId" tabindex="-1" aria-hidden="true"><option value="">请选择公司人员</option></select><small id="requesterMatchStatus" class="field-hint">默认当前登录人，可改选其他人员</small></label><label>出发时间<input name="departureTime" type="datetime-local" required /></label><label>当前公里数<input name="mileage" type="number" min="0" step="1" inputmode="numeric" placeholder="如 125000" required /></label></div>
               <div class="form-row route-form-row"><label>起点<input id="originInput" name="origin" required placeholder="可手动输入地点或选择门店" /><select id="originQuickSelect" class="quick-select" aria-label="起点快速选择"><option value="">快速选择门店</option></select><small class="field-hint">可直接输入任意地点；门店选项用于快速选择</small></label><label>目的地<input id="destinationInput" name="destination" required placeholder="可手动输入地点或选择门店" /><select id="destinationQuickSelect" class="quick-select" aria-label="目的地快速选择"><option value="">快速选择门店</option></select><small class="field-hint">可直接输入任意地点；门店选项用于快速选择</small></label></div>
-              <div class="form-row vehicle-form-row"><label class="vehicle-field">车辆<select id="vehicleDepartmentQuickSelect" class="quick-select" aria-label="按部门快速选择车辆"><option value="">按部门快速选择车辆</option></select><select id="vehicleSelect" name="vehicle" required><option value="">请选择车牌</option></select><span id="vehicleModel" class="vehicle-readout">选择车牌后显示车型描述</span><small id="vehicleStatus" class="field-hint" aria-live="polite">默认匹配登录人部门，也可切换部门再选择车牌；仅显示可调度车辆。</small></label></div>
+              <div class="form-row vehicle-form-row"><label class="vehicle-field">车辆<select id="vehicleDepartmentQuickSelect" class="quick-select" aria-label="按部门快速选择车辆"><option value="">按部门快速选择车辆</option></select><select id="vehicleSelect" name="vehicle" required><option value="">请选择车牌</option></select><span id="vehicleModel" class="vehicle-readout">选择车牌后显示车型描述</span><small id="vehicleStatus" class="field-hint" aria-live="polite">移动调度默认显示全部可调度车辆，也可按部门筛选；仅显示可调度车辆。</small></label></div>
               <div class="form-grid advanced-fields"><label>下次保养公里数<input name="nextMaintenanceMileage" type="number" min="0" step="1" inputmode="numeric" placeholder="自动带出，可修改" /></label><label>调度状态<select name="status"><option>已预约</option><option selected>待调度</option><option>已排程</option><option>执行中</option></select></label></div>
 
               <section class="photo-section"><div class="section-heading"><div><p class="eyebrow">DEPARTURE CHECK</p><h3>出发前车辆照片</h3></div></div><p id="departurePhotoStatus" class="field-hint">照片保持原始分辨率，并添加时间、阶段和方位水印；不采集位置。</p><div class="photo-grid"><label class="photo-slot"><span>前方</span><input type="file" accept="image/*" capture="environment" data-photo-phase="departure" data-photo-position="front" /><div id="departurePreviewFront" class="photo-preview">＋</div></label><label class="photo-slot"><span>后方</span><input type="file" accept="image/*" capture="environment" data-photo-phase="departure" data-photo-position="rear" /><div id="departurePreviewRear" class="photo-preview">＋</div></label><label class="photo-slot"><span>左侧</span><input type="file" accept="image/*" capture="environment" data-photo-phase="departure" data-photo-position="left" /><div id="departurePreviewLeft" class="photo-preview">＋</div></label><label class="photo-slot"><span>右侧</span><input type="file" accept="image/*" capture="environment" data-photo-phase="departure" data-photo-position="right" /><div id="departurePreviewRight" class="photo-preview">＋</div></label><label class="photo-slot photo-extra"><span>补充照片（可选）</span><input type="file" accept="image/*" capture="environment" data-photo-phase="departure" data-photo-position="extra" /><div id="departurePreviewExtra" class="photo-preview">＋</div></label></div><div class="form-row photo-meta"><label>检查结果<select id="departureCheckResult" name="departureCheckResult"><option>外观正常</option><option>发现损伤</option><option>其他</option></select></label><label>照片备注（可选）<textarea id="departurePhotoNotes" name="departurePhotoNotes" rows="2" placeholder="记录补充照片或需要关注的车况"></textarea></label></div></section>
@@ -231,6 +244,6 @@
       </div>
     </dialog>
     <script src="/theme.js?v=20260916-guideline-fixes-1"></script>
-    <script src="/app.js?v=20260916-tracker-history-4" defer></script>
+    <script src="/app.js?v=20260921-tracker-ranges-1" defer></script>
   </body>
 </html>

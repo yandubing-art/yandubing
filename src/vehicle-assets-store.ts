@@ -39,6 +39,7 @@ type VehicleProfilePhoto = {
 type AssetFile = {
   maintenance: VehicleMaintenanceRecord[];
   profilePhotos: Record<string, VehicleProfilePhoto>;
+  profilePhotoRemoteTokens: Record<string, string>;
 };
 
 type UploadPayload = { fileName: string; dataUrl: string };
@@ -83,15 +84,16 @@ export class VehicleAssetsStore {
   }
 
   private load(): AssetFile {
-    if (!fs.existsSync(this.filePath)) return { maintenance: [], profilePhotos: {} };
+    if (!fs.existsSync(this.filePath)) return { maintenance: [], profilePhotos: {}, profilePhotoRemoteTokens: {} };
     try {
       const data = JSON.parse(fs.readFileSync(this.filePath, "utf8")) as Partial<AssetFile>;
       return {
         maintenance: Array.isArray(data.maintenance) ? data.maintenance : [],
-        profilePhotos: data.profilePhotos && typeof data.profilePhotos === "object" ? data.profilePhotos : {}
+        profilePhotos: data.profilePhotos && typeof data.profilePhotos === "object" ? data.profilePhotos : {},
+        profilePhotoRemoteTokens: data.profilePhotoRemoteTokens && typeof data.profilePhotoRemoteTokens === "object" ? data.profilePhotoRemoteTokens as Record<string, string> : {}
       };
     } catch {
-      return { maintenance: [], profilePhotos: {} };
+      return { maintenance: [], profilePhotos: {}, profilePhotoRemoteTokens: {} };
     }
   }
 
@@ -116,6 +118,7 @@ export class VehicleAssetsStore {
       thumbnail: this.storeFile("vehicle-thumb", thumbnail, allowedPhotoTypes, MAX_PROFILE_PHOTO_BYTES)
     };
     this.state.profilePhotos[assetKey(tableId, recordId)] = entry;
+    delete this.state.profilePhotoRemoteTokens[assetKey(tableId, recordId)];
     this.persist();
     return entry;
   }
@@ -123,6 +126,28 @@ export class VehicleAssetsStore {
   profilePhoto(tableId: string, recordId: string): VehicleProfilePhoto | undefined {
     const entry = this.state.profilePhotos[assetKey(tableId, recordId)];
     return entry ? { ...entry, full: { ...entry.full }, thumbnail: { ...entry.thumbnail } } : undefined;
+  }
+
+  profilePhotoUpload(tableId: string, recordId: string): { fileName: string; dataUrl: string } | undefined {
+    const photo = this.state.profilePhotos[assetKey(tableId, recordId)];
+    if (!photo) return undefined;
+    // Keep the UI lightweight with the thumbnail, but sync the original image
+    // to Base so the remote record retains the best available source file.
+    const filePath = this.absolutePath(photo.full);
+    if (!filePath) return undefined;
+    return {
+      fileName: photo.full.fileName,
+      dataUrl: `data:${photo.full.mimeType};base64,${fs.readFileSync(filePath).toString("base64")}`
+    };
+  }
+
+  profilePhotoRemoteToken(tableId: string, recordId: string): string {
+    return this.state.profilePhotoRemoteTokens[assetKey(tableId, recordId)] || "";
+  }
+
+  markProfilePhotoSynced(tableId: string, recordId: string, remoteToken: string): void {
+    this.state.profilePhotoRemoteTokens[assetKey(tableId, recordId)] = remoteToken;
+    this.persist();
   }
 
   addMaintenance(input: Omit<VehicleMaintenanceRecord, "id" | "confirmedAt" | "warrantyDocument"> & { warrantyDocument?: UploadPayload }): VehicleMaintenanceRecord {
@@ -159,6 +184,7 @@ export class VehicleAssetsStore {
       this.removeFile(photo.thumbnail);
       delete this.state.profilePhotos[key];
     }
+    delete this.state.profilePhotoRemoteTokens[key];
 
     const retained: VehicleMaintenanceRecord[] = [];
     for (const record of this.state.maintenance) {

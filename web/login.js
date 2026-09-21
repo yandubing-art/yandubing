@@ -1,7 +1,10 @@
 (() => {
   const params = new URLSearchParams(window.location.search);
   const safeNext = (value) => value && value.startsWith("/") && !value.startsWith("//") ? value : "/?view=apply";
-  const state = { language: sessionStorage.getItem("dispatch_language") === "en" ? "en" : "zh", next: safeNext(params.get("next")) };
+  const phoneLanguages = Array.isArray(navigator.languages) && navigator.languages.length ? navigator.languages : [navigator.language || "en"];
+  const browserLanguage = phoneLanguages.some((language) => /^zh(?:-|$)/i.test(String(language))) ? "zh" : "en";
+  const languageOverride = sessionStorage.getItem("dispatch_language_override_v2");
+  const state = { language: languageOverride === "en" || languageOverride === "zh" ? languageOverride : browserLanguage, next: safeNext(params.get("next")) };
   const $ = (id) => document.getElementById(id);
   const strings = {
     "车辆调度控制台": "Vehicle Dispatch Console", "使用公司 Lark 账号或独立账号进入。默认进入移动设备调度；有权限的账号可单独进入桌面调度台。": "Sign in with your company Lark account or an independent account. Mobile dispatch is the default; authorized users can open the desktop console.", "让每一次出发都清晰可追踪。统一连接公司人员、车辆与调度任务，默认进入移动设备调度。": "Keep every departure clear and traceable. Connect people, vehicles and dispatch tasks in one workspace, with mobile dispatch as the default.", "统一车队": "One fleet", "随时调度": "Always ready", "协同工作台": "Lark workspace", "移动调度": "Mobile dispatch", "桌面调度": "Desktop console", "车辆管理": "Vehicle management", "账号权限": "Account permissions", "登录调度系统": "Sign in to dispatch", "使用 Lark 账号登录": "Sign in with Lark", "使用独立账号登录": "Sign in with independent account", "其他登录方式": "Other sign-in options", "使用公司 Lark 账号安全登录，成功后进入移动设备调度。": "Sign in securely with your company Lark account and continue to mobile dispatch.", "或使用独立账号": "or use an independent account", "账号": "Username", "密码": "Password", "输入账号": "Enter username", "输入密码": "Enter password", "登录并进入移动调度": "Sign in to mobile dispatch", "后台管理登录": "Admin portal sign-in", "预约车辆": "Reserve a vehicle", "预览测试入口": "Preview test access", "仅用于本地体验，不适用于正式上线。": "For local evaluation only; unavailable in production.", "使用预览管理员账号": "Use preview administrator", "账号由管理员分配角色：调度员、排程员、车队管理员或管理员。": "Administrators assign one of four roles: dispatcher, scheduler, fleet manager or administrator.", "登录失败，请重试。": "Sign-in failed. Please try again.", "正在登录…": "Signing in…", "Lark 登录未配置": "Lark sign-in is not configured", "登录已取消": "Sign-in was cancelled", "VALUECO OPERATIONS SYSTEM": "VALUECO OPERATIONS SYSTEM"
@@ -39,7 +42,7 @@
     if (!response.ok) { setMessage(payload.error || t("登录失败，请重试。"), "error"); return; }
     window.location.replace(payload.redirect || state.next);
   });
-  $("loginLanguageToggle").addEventListener("click", () => { state.language = state.language === "en" ? "zh" : "en"; sessionStorage.setItem("dispatch_language", state.language); translate(); window.dispatchEvent(new Event("dispatch:language")); });
+  $("loginLanguageToggle").addEventListener("click", () => { state.language = state.language === "en" ? "zh" : "en"; sessionStorage.setItem("dispatch_language_override_v2", state.language); translate(); window.dispatchEvent(new Event("dispatch:language")); });
   fetch("/api/auth/providers").then((response) => response.json()).then((providers) => {
     $("larkLogin").hidden = !providers.lark;
     $("larkLoginHint").hidden = !providers.lark;

@@ -8,9 +8,9 @@ import { AuthStore, type AccountRole, type AuthPrincipal, type Permission } from
 import { LarkClient } from "./lark.js";
 import { JobStore } from "./store.js";
 import { DispatchScheduler, taskFromRecord } from "./scheduler.js";
-import { canAccessTask } from "./task.js";
+import { canAccessTask, canEditTask, isDepartedTask } from "./task.js";
 import { numberValue, textValue } from "./value.js";
-import { NotificationSettingsStore, type NotificationStage } from "./notification-settings.js";
+import { NotificationSettingsStore, type NotificationStage, type VehicleReminderKind, type VehicleReminderRule } from "./notification-settings.js";
 import { VehicleAssetsStore } from "./vehicle-assets-store.js";
 import { LarkPhotoSyncStore, oauthTokenData, tokenLifetimeMs } from "./lark-photo-sync-store.js";
 import { TrackerHistoryStore } from "./tracker-history-store.js";
@@ -41,9 +41,15 @@ function routeParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] || "" : value || "";
 }
 
-function vehicleWithLocalAssets<T extends { tableId: string; recordId: string; photoUrl: string }>(vehicle: T): T {
+function vehicleWithLocalAssets<T extends { tableId: string; recordId: string; photoUrl: string; fleetCardPhotoUrl: string; photoFileToken?: string; fleetCardPhotoFileToken?: string }>(vehicle: T): T {
+  const remotePhoto = vehicle.photoUrl || ("photoFileToken" in vehicle && vehicle.photoFileToken
+    ? `/api/vehicles/${encodeURIComponent(vehicle.tableId)}/${encodeURIComponent(vehicle.recordId)}/attachment/${encodeURIComponent(String(vehicle.photoFileToken))}`
+    : "");
+  const remoteFleetCard = !vehicle.fleetCardPhotoUrl && "fleetCardPhotoFileToken" in vehicle && vehicle.fleetCardPhotoFileToken
+    ? `/api/vehicles/${encodeURIComponent(vehicle.tableId)}/${encodeURIComponent(vehicle.recordId)}/attachment/${encodeURIComponent(String(vehicle.fleetCardPhotoFileToken))}`
+    : vehicle.fleetCardPhotoUrl;
   const photo = vehicleAssets.profilePhoto(vehicle.tableId, vehicle.recordId);
-  if (!photo) return vehicle;
+  if (!photo) return { ...vehicle, photoUrl: remotePhoto, fleetCardPhotoUrl: remoteFleetCard };
   const base = `/api/vehicles/${encodeURIComponent(vehicle.tableId)}/${encodeURIComponent(vehicle.recordId)}/photo`;
   // The binary endpoint is cacheable, so its URL must change when a new
   // profile photo replaces the old file.  Without this token, browsers can
@@ -55,8 +61,60 @@ function vehicleWithLocalAssets<T extends { tableId: string; recordId: string; p
   };
 }
 
-function vehiclesWithLocalAssets<T extends { tableId: string; recordId: string; photoUrl: string }>(vehicles: T[]): T[] {
+function vehiclesWithLocalAssets<T extends { tableId: string; recordId: string; photoUrl: string; fleetCardPhotoUrl: string; photoFileToken?: string; fleetCardPhotoFileToken?: string }>(vehicles: T[]): T[] {
   return vehicles.map(vehicleWithLocalAssets);
+}
+
+function compactDispatchVehicles(vehicles: VehicleProfile[]): Array<Pick<VehicleProfile, "tableId" | "tableName" | "recordId" | "plate" | "brand" | "model" | "modelDescription" | "vehicleType" | "status" | "owner" | "dispatchEligible" | "mileage" | "nextMaintenanceMileage">> {
+  return vehicles.filter((vehicle) => vehicle.dispatchEligible && !/sold|已售/i.test(`${vehicle.status} ${vehicle.plate}`)).map((vehicle) => ({
+    tableId: vehicle.tableId,
+    tableName: vehicle.tableName,
+    recordId: vehicle.recordId,
+    plate: vehicle.plate,
+    brand: vehicle.brand,
+    model: vehicle.model,
+    modelDescription: vehicle.modelDescription,
+    vehicleType: vehicle.vehicleType,
+    status: vehicle.status,
+    owner: vehicle.owner,
+    dispatchEligible: vehicle.dispatchEligible,
+    mileage: vehicle.mileage,
+    nextMaintenanceMileage: vehicle.nextMaintenanceMileage
+  }));
+}
+
+async function syncBackendVehiclePhotos(vehicles: VehicleProfile[]): Promise<{ vehicles: VehicleProfile[]; checked: number; synced: number; failed: number }> {
+  if (!config.previewMode && !photoSync.status().active) return { vehicles, checked: 0, synced: 0, failed: 0 };
+  let checked = 0;
+  let synced = 0;
+  let failed = 0;
+  for (const vehicle of vehicles) {
+    if (!vehicle.photoFieldConfigured) continue;
+    const upload = vehicleAssets.profilePhotoUpload(vehicle.tableId, vehicle.recordId);
+    if (!upload) continue;
+    checked += 1;
+    const knownRemoteToken = vehicleAssets.profilePhotoRemoteToken(vehicle.tableId, vehicle.recordId);
+    if (knownRemoteToken && knownRemoteToken === (vehicle.photoFileToken || "")) continue;
+    try {
+      const remoteToken = await lark.syncBackendVehiclePhoto(vehicle, upload);
+      vehicleAssets.markProfilePhotoSynced(vehicle.tableId, vehicle.recordId, remoteToken);
+      vehicle.photoFileToken = remoteToken;
+      synced += 1;
+      console.info("Backend vehicle photo synced to Lark", { tableId: vehicle.tableId, recordId: vehicle.recordId });
+    } catch (error) {
+      failed += 1;
+      console.warn("Backend vehicle photo sync skipped", { tableId: vehicle.tableId, recordId: vehicle.recordId, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { vehicles, checked, synced, failed };
+}
+
+function canViewAllVehicles(principal: RequestPrincipal): boolean {
+  return principal.system || principal.permissions.includes("view_all_vehicles");
+}
+
+function hasPermission(principal: RequestPrincipal, permission: Permission): boolean {
+  return principal.system || principal.permissions.includes(permission);
 }
 
 function normalizedDepartment(value: string): string {
@@ -75,10 +133,6 @@ function departmentScope(value: string): string {
   return normalized;
 }
 
-function canViewAllVehicles(principal: RequestPrincipal): boolean {
-  return principal.system || principal.role === "admin";
-}
-
 function canViewVehicle(principal: RequestPrincipal, vehicle: Pick<VehicleProfile, "owner">): boolean {
   if (canViewAllVehicles(principal)) return true;
   const principalDepartment = departmentScope(principal.department || "");
@@ -90,6 +144,9 @@ function canViewVehicle(principal: RequestPrincipal, vehicle: Pick<VehicleProfil
 }
 
 function visibleVehicles(principal: RequestPrincipal, vehicles: VehicleProfile[]): VehicleProfile[] {
+  // Vehicle choice is operational, not task ownership. Mobile users may need
+  // to dispatch a vehicle assigned to another department; task access remains
+  // restricted separately by canAccessTask().
   return canViewAllVehicles(principal) ? vehicles : vehicles.filter((vehicle) => canViewVehicle(principal, vehicle));
 }
 
@@ -168,9 +225,18 @@ function authorized(req: Request): boolean {
 
 function principalForRequest(req: Request): RequestPrincipal | null {
   if (authorized(req)) {
-    return { accountId: "system", username: "system", displayName: "System", department: "", source: "local", role: "admin", permissions: ["mobile_dispatch", "desktop_console", "sync_dispatch", "manage_vehicles", "manage_accounts"], system: true };
+    return { accountId: "system", username: "system", displayName: "System", department: "", source: "local", role: "admin", permissions: [], system: true };
   }
   return sessionPrincipal(req);
+}
+
+function taskAccessPrincipal(req: Request, principal: RequestPrincipal): RequestPrincipal {
+  if (req.header("x-dispatch-client") !== "mobile") return principal;
+  return {
+    ...principal,
+    permissions: principal.permissions.filter((permission) => !["desktop_console", "view_all_tasks", "edit_all_dispatch"].includes(permission)),
+    system: false
+  };
 }
 
 function requireAuth(req: Request, res: Response, next: NextFunction): void {
@@ -190,8 +256,41 @@ function requirePermission(permission: Permission): (req: Request, res: Response
       res.status(401).json({ error: "unauthorized" });
       return;
     }
-    if (!principal.permissions.includes(permission)) {
+    if (!principal.system && !principal.permissions.includes(permission)) {
       res.status(403).json({ error: "forbidden", permission });
+      return;
+    }
+    res.locals.principal = principal;
+    next();
+  };
+}
+
+function requirePermissions(...permissions: Permission[]): (req: Request, res: Response, next: NextFunction) => void {
+  return (req, res, next) => {
+    const principal = principalForRequest(req);
+    if (!principal) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+    const missing = principal.system ? [] : permissions.filter((permission) => !principal.permissions.includes(permission));
+    if (missing.length) {
+      res.status(403).json({ error: "forbidden", permission: missing[0] });
+      return;
+    }
+    res.locals.principal = principal;
+    next();
+  };
+}
+
+function requireAnyPermission(...permissions: Permission[]): (req: Request, res: Response, next: NextFunction) => void {
+  return (req, res, next) => {
+    const principal = principalForRequest(req);
+    if (!principal) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+    if (!principal.system && !permissions.some((permission) => principal.permissions.includes(permission))) {
+      res.status(403).json({ error: "forbidden", permission: permissions[0] });
       return;
     }
     res.locals.principal = principal;
@@ -232,7 +331,7 @@ function noStore(res: Response): void {
   res.setHeader("Expires", "0");
 }
 
-const oauthStates = new Map<string, { next: string; expiresAt: number; purpose: "login" | "photo_sync" | "account_add"; role?: AccountRole }>();
+const oauthStates = new Map<string, { next: string; expiresAt: number; purpose: "login" | "photo_sync" | "account_add"; admin?: boolean; role?: AccountRole }>();
 
 function notificationMessage(stage: NotificationStage, record: Awaited<ReturnType<LarkClient["getRecord"]>>): string {
   const task = taskFromRecord(record);
@@ -257,6 +356,76 @@ async function sendNotification(stage: NotificationStage, record: Awaited<Return
   return { department: selected.department, sent, failed };
 }
 
+function reminderDate(kind: VehicleReminderKind, vehicle: VehicleProfile): string {
+  return kind === "maintenance" ? vehicle.nextMaintenanceDate.trim() : vehicle.certificateExpiry.trim();
+}
+
+function daysUntil(dateText: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText.trim());
+  if (!match) return null;
+  const due = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (Number.isNaN(due.getTime())) return null;
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.floor((due.getTime() - startOfToday.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+function vehicleReminderMessage(kind: VehicleReminderKind, vehicle: VehicleProfile, dueDate: string, remainingDays: number, mileageDue = false): string {
+  const title = kind === "maintenance" ? "保养临近提醒" : "年检临近提醒";
+  const dueText = mileageDue ? `当前公里数已接近保养里程（提前 ${vehicle.nextMaintenanceMileage === null ? "未填写" : `${vehicle.nextMaintenanceMileage} km`}）` : remainingDays < 0 ? `已逾期 ${Math.abs(remainingDays)} 天` : remainingDays === 0 ? "今天到期" : `还有 ${remainingDays} 天`;
+  const mileage = vehicle.mileage === null ? "未填写" : `${vehicle.mileage} km`;
+  const nextMaintenance = vehicle.nextMaintenanceMileage === null ? "未填写" : `${vehicle.nextMaintenanceMileage} km`;
+  return `【${title}】\n车牌：${vehicle.plate || "未填写"}\n车型：${vehicle.modelDescription || vehicle.model || "未填写"}\n所属部门：${vehicle.owner || "未填写"}\n车辆状态：${vehicle.status || "未填写"}\n当前公里数：${mileage}\n${kind === "maintenance" ? `下次保养日期：${dueDate}\n下次保养公里数：${nextMaintenance}` : `年检到期日期：${dueDate}`}\n提醒状态：${dueText}`;
+}
+
+async function sendVehicleReminder(kind: VehicleReminderKind, vehicle: VehicleProfile, rule: VehicleReminderRule): Promise<{ sent: number; failed: number; skipped?: string }> {
+  if (!rule.enabled) return { sent: 0, failed: 0, skipped: "提醒未启用" };
+  const dueDate = reminderDate(kind, vehicle);
+  const remainingDays = daysUntil(dueDate);
+  const mileageDue = kind === "maintenance"
+    && vehicle.mileage !== null
+    && vehicle.nextMaintenanceMileage !== null
+    && vehicle.mileage >= vehicle.nextMaintenanceMileage - rule.mileageBefore;
+  if ((remainingDays === null || remainingDays > rule.daysBefore) && !mileageDue) return { sent: 0, failed: 0, skipped: "尚未进入提醒窗口" };
+
+  const dueKey = dueDate || `mileage-${vehicle.nextMaintenanceMileage}`;
+  const eventId = `vehicle-reminder:${kind}:${vehicle.tableId}:${vehicle.recordId}:${dueKey}`;
+  const previous = notificationSettings.sentEvent(eventId);
+  if (previous && previous.count >= rule.maxSends) return { sent: 0, failed: 0, skipped: "已达到最大提醒次数" };
+  if (previous && Date.now() - Date.parse(previous.sentAt) < rule.frequencyHours * 60 * 60 * 1000) {
+    return { sent: 0, failed: 0, skipped: "尚未达到下次提醒时间" };
+  }
+
+  const selected = notificationSettings.reminderTargetsFor(vehicle.owner, kind);
+  if (!selected.targets.length) return { sent: 0, failed: 0, skipped: "未配置提醒目标" };
+  const displayDays = remainingDays === null ? 0 : remainingDays;
+  const results = await Promise.allSettled(selected.targets.map((target) => lark.sendTextMessage(target, vehicleReminderMessage(kind, vehicle, dueDate || "未填写（按公里数提醒）", displayDays, mileageDue))));
+  const sent = results.filter((result) => result.status === "fulfilled").length;
+  const failed = results.length - sent;
+  if (failed === 0 && sent > 0) notificationSettings.markSent(eventId, sent);
+  if (failed > 0) console.warn("Lark vehicle reminder delivery partially failed", { eventId, sent, failed });
+  return { sent, failed };
+}
+
+let vehicleReminderScanRunning = false;
+async function scanVehicleReminders(): Promise<void> {
+  if (vehicleReminderScanRunning) return;
+  vehicleReminderScanRunning = true;
+  try {
+    const vehicles = await lark.listVehicles();
+    const rules = notificationSettings.reminderRules();
+    const candidates = vehicles.filter((vehicle) => vehicle.dispatchEligible);
+    for (const vehicle of candidates) {
+      await sendVehicleReminder("maintenance", vehicle, rules.maintenance);
+      await sendVehicleReminder("inspection", vehicle, rules.inspection);
+    }
+  } catch (error) {
+    console.error("Vehicle reminder scan failed", error instanceof Error ? error.message : String(error));
+  } finally {
+    vehicleReminderScanRunning = false;
+  }
+}
+
 function pruneOAuthStates(): void {
   const timestamp = Date.now();
   for (const [state, item] of oauthStates) if (item.expiresAt <= timestamp) oauthStates.delete(state);
@@ -279,6 +448,17 @@ app.get("/login", (_req, res) => {
   res.sendFile(path.join(webRoot, "login.html"));
 });
 
+app.get("/api/vehicles/:tableId/:recordId/attachment/:fileToken", requireAnyPermission("mobile_dispatch", "desktop_console"), async (req, res, next) => {
+  try {
+    const file = await lark.downloadVehicleImage(routeParam(req.params.tableId), routeParam(req.params.recordId), routeParam(req.params.fileToken));
+    res.setHeader("Cache-Control", "private, max-age=86400");
+    res.type(file.mimeType);
+    res.send(file.content);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/admin-login", (_req, res) => {
   noStore(res);
   res.setHeader("Set-Cookie", clearSessionCookie());
@@ -295,10 +475,28 @@ app.get("/accounts", (req, res) => {
     res.status(403).send("账号管理需要管理员权限");
     return;
   }
+  noStore(res);
   res.sendFile(path.join(webRoot, "accounts.html"));
 });
 
+app.get("/permissions", (req, res) => {
+  const principal = sessionPrincipal(req);
+  if (!principal) {
+    res.redirect(`/admin-login?next=${encodeURIComponent(req.originalUrl)}`);
+    return;
+  }
+  if (!principal.permissions.includes("manage_accounts")) {
+    res.status(403).send("权限管理需要账号管理权限");
+    return;
+  }
+  noStore(res);
+  res.sendFile(path.join(webRoot, "permissions.html"));
+});
+
 app.get(["/", "/index.html"], (req, res) => {
+  // This response varies by session and requested workflow. Never let a
+  // desktop HTML shell be reused while a mobile account is loading.
+  noStore(res);
   const principal = sessionPrincipal(req);
   if (!principal) {
     const requestedView = typeof req.query.view === "string" ? req.query.view : "apply";
@@ -318,7 +516,7 @@ app.get(["/", "/index.html"], (req, res) => {
     res.redirect("/?view=apply");
     return;
   }
-  if (requestedView === "settings" && !principal.permissions.includes("manage_accounts")) {
+  if (requestedView === "settings" && !principal.permissions.some((permission) => ["manage_photo_sync", "manage_notifications"].includes(permission))) {
     res.redirect("/?view=apply");
     return;
   }
@@ -399,9 +597,10 @@ app.get("/api/auth/lark/start", (req, res) => {
     return;
   }
   pruneOAuthStates();
+  const adminLogin = req.query.admin === "1" || req.query.admin === "true";
   const nextTarget = safeNext(req.query.next);
   const state = crypto.randomBytes(32).toString("base64url");
-  oauthStates.set(state, { next: nextTarget, expiresAt: Date.now() + 10 * 60 * 1000, purpose: "login" });
+  oauthStates.set(state, { next: nextTarget, expiresAt: Date.now() + 10 * 60 * 1000, purpose: "login", admin: adminLogin });
   console.info("Lark OAuth start", { next: nextTarget, redirectUri: config.larkOAuthRedirectUri });
   const authorizeUrl = new URL("https://accounts.larksuite.com/open-apis/authen/v1/authorize");
   authorizeUrl.searchParams.set("client_id", config.larkAppId);
@@ -411,11 +610,11 @@ app.get("/api/auth/lark/start", (req, res) => {
   res.redirect(authorizeUrl.toString());
 });
 
-app.get("/api/admin/lark-photo-sync/status", requirePermission("manage_vehicles"), (_req, res) => {
+app.get("/api/admin/lark-photo-sync/status", requirePermission("manage_photo_sync"), (_req, res) => {
   res.json({ ok: true, sync: photoSync.status() });
 });
 
-app.get("/api/admin/lark-photo-sync/start", requirePermission("manage_vehicles"), (_req, res) => {
+app.get("/api/admin/lark-photo-sync/start", requirePermission("manage_photo_sync"), (_req, res) => {
   if (!config.larkOAuthRedirectUri) {
     res.status(503).send("Lark OAuth 未配置，请设置 LARK_OAUTH_REDIRECT_URI");
     return;
@@ -468,7 +667,7 @@ app.get("/api/auth/lark/callback", async (req, res) => {
   const isAccountAdd = stateData.purpose === "account_add";
   const failureRedirect = (message: string): void => {
     console.warn("Lark OAuth failed", { purpose: stateData?.purpose || "unknown", message });
-    const target = isPhotoSync ? `/?view=settings&photo_sync_error=${encodeURIComponent(message)}` : isAccountAdd ? `/accounts?lark_error=${encodeURIComponent(message)}` : `/login?error=${encodeURIComponent(message)}`;
+    const target = isPhotoSync ? `/?view=settings&photo_sync_error=${encodeURIComponent(message)}` : isAccountAdd ? `/accounts?lark_error=${encodeURIComponent(message)}` : stateData.admin ? `/admin-login?error=${encodeURIComponent(message)}` : `/login?error=${encodeURIComponent(message)}`;
     res.redirect(target);
   };
   if (typeof req.query.error === "string") {
@@ -511,6 +710,10 @@ app.get("/api/auth/lark/callback", async (req, res) => {
     const userData = userPayload.data as Record<string, unknown> | undefined;
     if (!userResponse.ok || String(userPayload.code) !== "0" || !userData?.open_id) throw new Error(authErrorMessage(userPayload.msg));
     const principal = authStore.upsertLarkAccount({ openId: String(userData.open_id), name: String(userData.name || ""), enName: String(userData.en_name || ""), email: String(userData.enterprise_email || userData.email || "") });
+    if (stateData.admin && !principal.permissions.includes("desktop_console")) {
+      failureRedirect("当前 Lark 账号没有后台管理权限，请先在账号权限中为该账号分配桌面调度权限");
+      return;
+    }
     if (isAccountAdd && stateData.role) authStore.updateAccount(principal.accountId, { role: stateData.role, active: true });
     if (isAccountAdd) {
       const grantedPrincipal = authStore.getPrincipal(principal.accountId) || principal;
@@ -523,7 +726,7 @@ app.get("/api/auth/lark/callback", async (req, res) => {
     const session = authStore.createSession(principal);
     const maxAge = Math.max(1, Math.floor((session.expiresAt - Date.now()) / 1000));
     res.setHeader("Set-Cookie", sessionCookie(session.token, maxAge));
-    res.redirect(larkLoginRedirect(stateData.next));
+    res.redirect(stateData.admin ? (stateData.next === "/" ? "/?view=overview" : stateData.next) : larkLoginRedirect(stateData.next));
   } catch (error) {
     const message = authErrorMessage(error instanceof Error ? error.message : error);
     if (isPhotoSync) console.warn("Lark photo-sync OAuth callback failed:", message);
@@ -533,6 +736,28 @@ app.get("/api/auth/lark/callback", async (req, res) => {
 
 app.get("/api/auth/accounts", requirePermission("manage_accounts"), (_req, res) => {
   res.json({ ok: true, accounts: authStore.listAccounts() });
+});
+
+app.get("/api/auth/roles", requirePermission("manage_accounts"), (_req, res) => {
+  res.json({ ok: true, roles: authStore.listRolePermissions() });
+});
+
+app.patch("/api/auth/roles/:role", requirePermission("manage_accounts"), (req, res, next) => {
+  try {
+    const role = routeParam(req.params.role);
+    if (!["dispatcher", "scheduler", "fleet_manager", "admin"].includes(role)) {
+      res.status(400).json({ error: "角色无效" });
+      return;
+    }
+    if (!Array.isArray(req.body?.permissions)) {
+      res.status(400).json({ error: "permissions array is required" });
+      return;
+    }
+    const permissions = req.body.permissions.filter((value: unknown): value is Permission => typeof value === "string") as Permission[];
+    res.json({ ok: true, role, permissions: authStore.updateRolePermissions(role, permissions) });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.post("/api/auth/accounts", requirePermission("manage_accounts"), (req, res, next) => {
@@ -548,10 +773,12 @@ app.post("/api/auth/accounts", requirePermission("manage_accounts"), (req, res, 
 app.patch("/api/auth/accounts/:accountId", requirePermission("manage_accounts"), (req, res, next) => {
   try {
     const accountId = Array.isArray(req.params.accountId) ? req.params.accountId[0] : req.params.accountId;
-    const patch: { displayName?: string; department?: string; role?: string; active?: boolean } = {};
+    const patch: { displayName?: string; department?: string; role?: string; permissions?: Permission[]; resetPermissions?: boolean; active?: boolean } = {};
     if (typeof req.body?.displayName === "string") patch.displayName = req.body.displayName;
     if (typeof req.body?.department === "string") patch.department = req.body.department;
     if (typeof req.body?.role === "string") patch.role = req.body.role;
+    if (Array.isArray(req.body?.permissions)) patch.permissions = req.body.permissions as Permission[];
+    if (req.body?.resetPermissions === true) patch.resetPermissions = true;
     if (typeof req.body?.active === "boolean") patch.active = req.body.active;
     res.json({ ok: true, account: authStore.updateAccount(accountId, patch) });
   } catch (error) {
@@ -559,17 +786,17 @@ app.patch("/api/auth/accounts/:accountId", requirePermission("manage_accounts"),
   }
 });
 
-app.get("/api/admin/notification-settings", requirePermission("manage_accounts"), (_req, res) => {
-  res.json({ ok: true, departments: notificationSettings.list() });
+app.get("/api/admin/notification-settings", requirePermission("manage_notifications"), (_req, res) => {
+  res.json({ ok: true, departments: notificationSettings.list(), reminders: notificationSettings.reminderRules() });
 });
 
-app.put("/api/admin/notification-settings", requirePermission("manage_accounts"), (req, res, next) => {
+app.put("/api/admin/notification-settings", requirePermission("manage_notifications"), (req, res, next) => {
   try {
     if (!Array.isArray(req.body?.departments)) {
       res.status(400).json({ error: "departments array is required" });
       return;
     }
-    res.json({ ok: true, departments: notificationSettings.update(req.body.departments) });
+    res.json({ ok: true, departments: notificationSettings.update(req.body.departments, req.body.reminders), reminders: notificationSettings.reminderRules() });
   } catch (error) {
     next(error);
   }
@@ -588,18 +815,19 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "lark-dispatch-backend", previewMode: config.previewMode, executorConfigured: Boolean(config.dispatchExecutorUrl) });
 });
 
-app.get("/api/tasks", requirePermission("mobile_dispatch"), async (req, res, next) => {
+app.get("/api/tasks", requireAnyPermission("mobile_dispatch", "desktop_console"), requireAnyPermission("view_own_tasks", "view_all_tasks"), async (req, res, next) => {
   try {
     const records = await lark.listRecords();
     const principal = res.locals.principal as RequestPrincipal;
-    const tasks = records.map(taskFromRecord).filter((task) => canAccessTask(task, principal));
+    const accessPrincipal = taskAccessPrincipal(req, principal);
+    const tasks = records.map(taskFromRecord).filter((task) => canAccessTask(task, accessPrincipal));
     res.json({ ok: true, tasks });
   } catch (error) {
     next(error);
   }
 });
 
-app.post("/api/bookings", requirePermission("mobile_dispatch"), async (req, res, next) => {
+app.post("/api/bookings", requireAnyPermission("mobile_dispatch", "desktop_console"), requirePermission("book_vehicle"), async (req, res, next) => {
   try {
     const input = req.body?.fields;
     if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -632,7 +860,7 @@ app.post("/api/bookings", requirePermission("mobile_dispatch"), async (req, res,
   }
 });
 
-app.post("/api/bookings/:recordId/decision", requirePermission("sync_dispatch"), async (req, res, next) => {
+app.post("/api/bookings/:recordId/decision", requireAnyPermission("mobile_dispatch", "desktop_console"), requirePermission("approve_bookings"), async (req, res, next) => {
   try {
     const recordId = routeParam(req.params.recordId);
     const decision = req.body?.decision === "approve" ? "approve" : req.body?.decision === "reject" ? "reject" : "";
@@ -658,13 +886,13 @@ app.post("/api/bookings/:recordId/decision", requirePermission("sync_dispatch"),
   }
 });
 
-app.get("/api/options", requirePermission("mobile_dispatch"), async (_req, res, next) => {
+app.get("/api/options", requireAnyPermission("mobile_dispatch", "desktop_console"), async (_req, res, next) => {
   try {
     const principal = res.locals.principal as RequestPrincipal;
     const warnings: string[] = [];
     const [users, vehicles, stores] = await Promise.all([
       lark.listUsers(),
-      lark.listVehicles(),
+      lark.listVehicles().then(async (vehicles) => (await syncBackendVehiclePhotos(vehicles)).vehicles),
       lark.listStores().catch((error) => {
         warnings.push(`门店快捷选项暂不可用：${error instanceof Error ? error.message : String(error)}`);
         return [];
@@ -679,7 +907,7 @@ app.get("/api/options", requirePermission("mobile_dispatch"), async (_req, res, 
 // Keep the option sources independently loadable. The directory can take
 // longer than the fleet tables, so the UI can render vehicles and stores
 // without waiting for every contact page to finish.
-app.get("/api/options/users", requirePermission("mobile_dispatch"), async (_req, res, next) => {
+app.get("/api/options/users", requireAnyPermission("mobile_dispatch", "desktop_console"), async (_req, res, next) => {
   try {
     res.json({ ok: true, users: await lark.listUsers() });
   } catch (error) {
@@ -687,16 +915,26 @@ app.get("/api/options/users", requirePermission("mobile_dispatch"), async (_req,
   }
 });
 
-app.get("/api/options/vehicles", requirePermission("mobile_dispatch"), async (_req, res, next) => {
+app.get("/api/options/vehicles", requireAnyPermission("mobile_dispatch", "desktop_console"), async (req, res, next) => {
   try {
     const principal = res.locals.principal as RequestPrincipal;
-    res.json({ ok: true, vehicles: vehiclesWithLocalAssets(visibleVehicles(principal, await lark.listVehicles())) });
+    const vehicles = await lark.listVehicles();
+    // Vehicle data is needed immediately by the mobile selectors. Profile
+    // photo reconciliation is independent work and must not hold up that
+    // response or the first screen.
+    const visible = visibleVehicles(principal, vehicles);
+    res.json({ ok: true, vehicles: req.query.compact === "1" ? compactDispatchVehicles(visible) : vehiclesWithLocalAssets(visible) });
+    void syncBackendVehiclePhotos(vehicles).then((result) => {
+      if (result.synced || result.failed) console.info("Background vehicle photo sync finished", result);
+    }).catch((error) => {
+      console.warn("Background vehicle photo sync failed", error instanceof Error ? error.message : String(error));
+    });
   } catch (error) {
     next(error);
   }
 });
 
-app.get("/api/options/stores", requirePermission("mobile_dispatch"), async (_req, res, next) => {
+app.get("/api/options/stores", requireAnyPermission("mobile_dispatch", "desktop_console"), async (_req, res, next) => {
   try {
     res.json({ ok: true, stores: await lark.listStores() });
   } catch (error) {
@@ -735,16 +973,17 @@ app.put("/api/admin/vehicle-field-options", requirePermission("manage_vehicles")
   }
 });
 
-app.get("/api/vehicles", requirePermission("mobile_dispatch"), async (_req, res, next) => {
+app.get("/api/vehicles", requireAnyPermission("mobile_dispatch", "desktop_console"), async (_req, res, next) => {
   try {
     const principal = res.locals.principal as RequestPrincipal;
-    res.json({ ok: true, vehicles: vehiclesWithLocalAssets(visibleVehicles(principal, await lark.listVehicles())) });
+    const photoSyncResult = await syncBackendVehiclePhotos(await lark.listVehicles());
+    res.json({ ok: true, vehicles: vehiclesWithLocalAssets(visibleVehicles(principal, photoSyncResult.vehicles)), vehiclePhotosChecked: photoSyncResult.checked, vehiclePhotosSynced: photoSyncResult.synced, vehiclePhotoSyncFailed: photoSyncResult.failed });
   } catch (error) {
     next(error);
   }
 });
 
-app.get("/api/tracker/status", requirePermission("mobile_dispatch"), async (_req, res, next) => {
+app.get("/api/tracker/status", requireAnyPermission("mobile_dispatch", "desktop_console"), async (_req, res, next) => {
   try {
     noStore(res);
     const principal = res.locals.principal as RequestPrincipal;
@@ -755,7 +994,7 @@ app.get("/api/tracker/status", requirePermission("mobile_dispatch"), async (_req
   }
 });
 
-app.get("/api/tracker/history", requirePermission("desktop_console"), async (req, res, next) => {
+app.get("/api/tracker/history", requirePermissions("desktop_console", "view_tracker_history"), async (req, res, next) => {
   try {
     noStore(res);
     const principal = res.locals.principal as RequestPrincipal;
@@ -846,7 +1085,7 @@ app.get("/api/tracker/history", requirePermission("desktop_console"), async (req
   }
 });
 
-app.post("/api/tracker/refresh", requirePermission("manage_vehicles"), (_req, res) => {
+app.post("/api/tracker/refresh", requirePermissions("manage_vehicles", "refresh_tracker"), (_req, res) => {
   noStore(res);
   if (!config.trackerSyncEnabled) {
     res.status(409).json({ error: "Tracker 自动同步未启用，无法排队刷新。" });
@@ -865,7 +1104,7 @@ app.post("/api/tracker/refresh", requirePermission("manage_vehicles"), (_req, re
   });
 });
 
-app.get("/api/vehicles/lookup", requirePermission("mobile_dispatch"), async (req, res, next) => {
+app.get("/api/vehicles/lookup", requireAnyPermission("mobile_dispatch", "desktop_console"), async (req, res, next) => {
   try {
     const principal = res.locals.principal as RequestPrincipal;
     const plate = typeof req.query.plate === "string" ? req.query.plate.trim() : "";
@@ -884,7 +1123,7 @@ app.get("/api/vehicles/lookup", requirePermission("mobile_dispatch"), async (req
   }
 });
 
-app.get("/api/vehicles/:tableId/:recordId/photo/:variant", requirePermission("mobile_dispatch"), (req, res) => {
+app.get("/api/vehicles/:tableId/:recordId/photo/:variant", requireAnyPermission("mobile_dispatch", "desktop_console"), (req, res) => {
   const tableId = routeParam(req.params.tableId);
   const recordId = routeParam(req.params.recordId);
   const variant = routeParam(req.params.variant);
@@ -919,13 +1158,13 @@ app.get("/api/vehicles/:tableId/:recordId/log-book/:fileToken", requirePermissio
   }
 });
 
-app.get("/api/vehicles/:tableId/:recordId/maintenance", requirePermission("manage_vehicles"), (req, res) => {
+app.get("/api/vehicles/:tableId/:recordId/maintenance", requirePermission("manage_maintenance"), (req, res) => {
   const tableId = routeParam(req.params.tableId);
   const recordId = routeParam(req.params.recordId);
   res.json({ ok: true, records: vehicleAssets.maintenanceFor(tableId, recordId) });
 });
 
-app.get("/api/vehicles/:tableId/:recordId/maintenance/:maintenanceId/warranty", requirePermission("manage_vehicles"), (req, res) => {
+app.get("/api/vehicles/:tableId/:recordId/maintenance/:maintenanceId/warranty", requirePermission("manage_maintenance"), (req, res) => {
   const tableId = routeParam(req.params.tableId);
   const recordId = routeParam(req.params.recordId);
   const maintenanceId = routeParam(req.params.maintenanceId);
@@ -941,7 +1180,7 @@ app.get("/api/vehicles/:tableId/:recordId/maintenance/:maintenanceId/warranty", 
   res.sendFile(filePath);
 });
 
-app.post("/api/vehicles/:tableId/:recordId/maintenance", requirePermission("manage_vehicles"), async (req, res, next) => {
+app.post("/api/vehicles/:tableId/:recordId/maintenance", requirePermission("manage_maintenance"), async (req, res, next) => {
   try {
     const tableId = routeParam(req.params.tableId);
     const recordId = routeParam(req.params.recordId);
@@ -1115,7 +1354,10 @@ app.delete("/api/vehicles/:tableId/:recordId", requirePermission("manage_vehicle
 
 app.post("/api/sync", requirePermission("sync_dispatch"), async (_req, res, next) => {
   try {
-    res.json({ ok: true, ...await scheduler.syncOnce() });
+    const result = await scheduler.syncOnce();
+    await scanVehicleReminders();
+    const photoSyncResult = await syncBackendVehiclePhotos(await lark.listVehicles());
+    res.json({ ok: true, ...result, vehiclePhotosChecked: photoSyncResult.checked, vehiclePhotosSynced: photoSyncResult.synced, vehiclePhotoSyncFailed: photoSyncResult.failed });
   } catch (error) {
     next(error);
   }
@@ -1135,7 +1377,7 @@ app.post("/api/executor/callback", requireAuth, async (req, res, next) => {
   }
 });
 
-app.post("/api/tasks", requirePermission("mobile_dispatch"), async (req, res, next) => {
+app.post("/api/tasks", requireAnyPermission("mobile_dispatch", "desktop_console"), requirePermission("create_dispatch"), async (req, res, next) => {
   try {
     const fields = req.body?.fields;
     const clientToken = req.body?.clientToken;
@@ -1150,6 +1392,10 @@ app.post("/api/tasks", requirePermission("mobile_dispatch"), async (req, res, ne
     const principal = res.locals.principal as RequestPrincipal;
     let preparedFields = normalizeTaskFields(fields as Record<string, unknown>);
     if (!textValue(preparedFields[config.fields.status]).trim()) preparedFields[config.fields.status] = "待调度";
+    if (textValue(preparedFields[config.fields.status]).trim() === "执行中" && !hasPermission(principal, "submit_departure")) {
+      res.status(403).json({ error: "没有出发登记权限", permission: "submit_departure" });
+      return;
+    }
     applyDefaultRequester(preparedFields, principal);
     const requester = preparedFields[config.fields.requester];
     if (!Array.isArray(requester) || requester.length === 0) {
@@ -1166,20 +1412,19 @@ app.post("/api/tasks", requirePermission("mobile_dispatch"), async (req, res, ne
     }
 
     const record = await lark.createRecord(preparedFields, clientToken);
-    let vehicleSync: unknown = null;
-    try {
-      const match = vehicleMatch && typeof vehicleMatch === "object" && "status" in vehicleMatch && vehicleMatch.status !== "unavailable" ? vehicleMatch as Parameters<typeof lark.syncVehicleMileage>[2] : undefined;
-      vehicleSync = await lark.syncVehicleMileage(textValue(preparedFields[config.fields.vehicle]), numberValue(preparedFields[config.fields.mileage]), match);
-    } catch (error) {
-      vehicleSync = { status: "unavailable", matched: false, updated: false, message: error instanceof Error ? error.message : String(error) };
-    }
-    res.status(201).json({ ok: true, recordId: record.record_id, vehicleMatch, vehicleSync });
+    const match = vehicleMatch && typeof vehicleMatch === "object" && "status" in vehicleMatch && vehicleMatch.status !== "unavailable" ? vehicleMatch as Parameters<typeof lark.syncVehicleMileage>[2] : undefined;
+    // The task record is the critical acknowledgement. Vehicle mileage sync
+    // is independent and can continue after the mobile request is answered.
+    void lark.syncVehicleMileage(textValue(preparedFields[config.fields.vehicle]), numberValue(preparedFields[config.fields.mileage]), match)
+      .then((result) => console.info("Background vehicle mileage sync finished", { recordId: record.record_id, result }))
+      .catch((error) => console.warn("Background vehicle mileage sync failed", { recordId: record.record_id, error: error instanceof Error ? error.message : String(error) }));
+    res.status(201).json({ ok: true, recordId: record.record_id, vehicleMatch, vehicleSync: { status: "pending", message: "车辆里程正在后台同步" } });
   } catch (error) {
     next(error);
   }
 });
 
-app.patch("/api/tasks/:recordId", requirePermission("mobile_dispatch"), async (req, res, next) => {
+app.patch("/api/tasks/:recordId", requireAnyPermission("mobile_dispatch", "desktop_console"), async (req, res, next) => {
   try {
     const fields = req.body?.fields;
     if (!fields || typeof fields !== "object" || Array.isArray(fields)) {
@@ -1189,11 +1434,16 @@ app.patch("/api/tasks/:recordId", requirePermission("mobile_dispatch"), async (r
     const recordId = Array.isArray(req.params.recordId) ? req.params.recordId[0] : req.params.recordId;
     const principal = res.locals.principal as RequestPrincipal;
     const currentRecord = await lark.getRecord(recordId);
-    if (!canAccessTask(taskFromRecord(currentRecord), principal)) {
-      res.status(403).json({ error: "只能编辑自己的调度记录" });
+    const currentTask = taskFromRecord(currentRecord);
+    if (!canEditTask(currentTask, taskAccessPrincipal(req, principal))) {
+      res.status(403).json({ error: "没有编辑该调度记录的权限" });
       return;
     }
     let preparedFields = normalizeTaskFields(fields as Record<string, unknown>);
+    if (textValue(preparedFields[config.fields.status]).trim() === "执行中" && !hasPermission(principal, "submit_departure")) {
+      res.status(403).json({ error: "没有出发登记权限", permission: "submit_departure" });
+      return;
+    }
     let vehicleMatch: unknown = null;
     try {
       const prepared = await lark.prepareTaskFields(preparedFields);
@@ -1204,20 +1454,17 @@ app.patch("/api/tasks/:recordId", requirePermission("mobile_dispatch"), async (r
     }
 
     const record = await lark.updateRecord(recordId, preparedFields);
-    let vehicleSync: unknown = null;
-    try {
-      const match = vehicleMatch && typeof vehicleMatch === "object" && "status" in vehicleMatch && vehicleMatch.status !== "unavailable" ? vehicleMatch as Parameters<typeof lark.syncVehicleMileage>[2] : undefined;
-      vehicleSync = await lark.syncVehicleMileage(textValue(preparedFields[config.fields.vehicle]), numberValue(preparedFields[config.fields.mileage]), match);
-    } catch (error) {
-      vehicleSync = { status: "unavailable", matched: false, updated: false, message: error instanceof Error ? error.message : String(error) };
-    }
-    res.json({ ok: true, recordId: record?.record_id || recordId, vehicleMatch, vehicleSync });
+    const match = vehicleMatch && typeof vehicleMatch === "object" && "status" in vehicleMatch && vehicleMatch.status !== "unavailable" ? vehicleMatch as Parameters<typeof lark.syncVehicleMileage>[2] : undefined;
+    void lark.syncVehicleMileage(textValue(preparedFields[config.fields.vehicle]), numberValue(preparedFields[config.fields.mileage]), match)
+      .then((result) => console.info("Background vehicle mileage sync finished", { recordId, result }))
+      .catch((error) => console.warn("Background vehicle mileage sync failed", { recordId, error: error instanceof Error ? error.message : String(error) }));
+    res.json({ ok: true, recordId: record?.record_id || recordId, vehicleMatch, vehicleSync: { status: "pending", message: "车辆里程正在后台同步" } });
   } catch (error) {
     next(error);
   }
 });
 
-app.post("/api/tasks/:recordId/transfer", requirePermission("mobile_dispatch"), async (req, res, next) => {
+app.post("/api/tasks/:recordId/transfer", requireAnyPermission("mobile_dispatch", "desktop_console"), requirePermission("submit_transfer"), async (req, res, next) => {
   try {
     const transferLocation = typeof req.body?.transferLocation === "string" ? req.body.transferLocation.trim() : "";
     if (!transferLocation) {
@@ -1228,12 +1475,16 @@ app.post("/api/tasks/:recordId/transfer", requirePermission("mobile_dispatch"), 
     const principal = res.locals.principal as RequestPrincipal;
     const currentRecord = await lark.getRecord(recordId);
     const task = taskFromRecord(currentRecord);
-    if (!canAccessTask(task, principal)) {
+    if (!canAccessTask(task, taskAccessPrincipal(req, principal))) {
       res.status(403).json({ error: "只能办理自己的中转记录" });
       return;
     }
     if (task.status === "已完成" || task.status === "取消" || task.returnMileage !== null || task.stage === "已返程") {
       res.status(409).json({ error: "该调度任务已完成或已返程，不能登记中转" });
+      return;
+    }
+    if (!isDepartedTask(task)) {
+      res.status(409).json({ error: "该任务尚未完成出发登记，不能登记中转" });
       return;
     }
     const record = await lark.updateRecord(recordId, {
@@ -1246,7 +1497,7 @@ app.post("/api/tasks/:recordId/transfer", requirePermission("mobile_dispatch"), 
   }
 });
 
-app.delete("/api/tasks/:recordId", requirePermission("sync_dispatch"), async (req, res, next) => {
+app.delete("/api/tasks/:recordId", requirePermission("delete_dispatch"), async (req, res, next) => {
   try {
     const recordId = Array.isArray(req.params.recordId) ? req.params.recordId[0] : req.params.recordId;
     const result = await lark.deleteRecord(recordId);
@@ -1276,7 +1527,7 @@ function photoPayload(value: unknown): Array<{ position: "front" | "rear" | "lef
   });
 }
 
-app.post("/api/tasks/:recordId/photos", requirePermission("mobile_dispatch"), async (req, res, next) => {
+app.post("/api/tasks/:recordId/photos", requireAnyPermission("mobile_dispatch", "desktop_console"), requirePermission("submit_photos"), async (req, res, next) => {
   try {
     const recordId = Array.isArray(req.params.recordId) ? req.params.recordId[0] : req.params.recordId;
     const phase = req.body?.phase === "return" ? "return" : req.body?.phase === "departure" ? "departure" : "";
@@ -1286,7 +1537,7 @@ app.post("/api/tasks/:recordId/photos", requirePermission("mobile_dispatch"), as
     }
     const principal = res.locals.principal as RequestPrincipal;
     const currentRecord = await lark.getRecord(recordId);
-    if (!canAccessTask(taskFromRecord(currentRecord), principal)) {
+    if (!canAccessTask(taskFromRecord(currentRecord), taskAccessPrincipal(req, principal))) {
       res.status(403).json({ error: "只能上传自己的车辆照片" });
       return;
     }
@@ -1303,7 +1554,7 @@ app.post("/api/tasks/:recordId/photos", requirePermission("mobile_dispatch"), as
   }
 });
 
-app.post("/api/tasks/:recordId/return", requirePermission("mobile_dispatch"), async (req, res, next) => {
+app.post("/api/tasks/:recordId/return", requireAnyPermission("mobile_dispatch", "desktop_console"), requirePermission("submit_return"), async (req, res, next) => {
   try {
     const recordId = Array.isArray(req.params.recordId) ? req.params.recordId[0] : req.params.recordId;
     const returnOrigin = typeof req.body?.returnOrigin === "string" ? req.body.returnOrigin.trim() : "";
@@ -1321,12 +1572,16 @@ app.post("/api/tasks/:recordId/return", requirePermission("mobile_dispatch"), as
     const record = await lark.getRecord(recordId);
     const principal = res.locals.principal as RequestPrincipal;
     const task = taskFromRecord(record);
-    if (!canAccessTask(task, principal)) {
+    if (!canAccessTask(task, taskAccessPrincipal(req, principal))) {
       res.status(403).json({ error: "只能办理自己的返程记录" });
       return;
     }
     if (task.status === "已完成" || task.returnMileage !== null) {
       res.status(409).json({ error: "该调度任务已完成返程，不能重复登记" });
+      return;
+    }
+    if (!isDepartedTask(task)) {
+      res.status(409).json({ error: "该任务尚未完成出发登记，不能登记返程" });
       return;
     }
     const result = await lark.completeReturn(recordId, returnOrigin, returnDestination, returnMileage, damageDescription, {
@@ -1353,11 +1608,13 @@ const server = app.listen(config.port, () => {
   void lark.warmOptions().catch((error) => {
     console.warn("Lark options warm-up failed; the next request will retry:", error instanceof Error ? error.message : String(error));
   });
+  void scanVehicleReminders();
 });
 
 const run = async (): Promise<void> => {
   try {
     await scheduler.syncOnce();
+    await scanVehicleReminders();
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
   }

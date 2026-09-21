@@ -52,7 +52,27 @@ export function taskFromRecord(record: BitableRecord): DispatchTask {
 }
 
 export function canAccessTask(task: DispatchTask, principal: TaskAccessPrincipal): boolean {
-  if (principal.system || principal.permissions.includes("desktop_console")) return true;
+  if (principal.system || principal.permissions.includes("desktop_console") || principal.permissions.includes("view_all_tasks")) return true;
+  return canAccessOwnTask(task, principal);
+}
+
+export function canAccessOwnTask(task: DispatchTask, principal: TaskAccessPrincipal): boolean {
   if (principal.larkOpenId && task.requesterId && sameIdentity(principal.larkOpenId, task.requesterId)) return true;
   return Boolean(task.requester && principal.displayName && sameIdentity(task.requester, principal.displayName));
+}
+
+export function canEditTask(task: DispatchTask, principal: TaskAccessPrincipal): boolean {
+  if (principal.system) return true;
+  if (principal.permissions.includes("edit_all_dispatch")) return true;
+  return principal.permissions.includes("edit_own_dispatch") && canAccessOwnTask(task, principal);
+}
+
+/** A task is eligible for in-transit actions only after departure was recorded. */
+export function isDepartedTask(task: DispatchTask): boolean {
+  if (["已预约", "待调度", "已排程", "已完成", "失败", "取消"].includes(task.status)) return false;
+  if (task.stage === "已返程") return false;
+  return task.status === "执行中"
+    || task.status === "已出发"
+    || ["已出发", "返程待登记"].includes(task.stage)
+    || task.departurePhotos.length > 0;
 }

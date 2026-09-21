@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f4f7fb" />
+    <title>权限管理 · 车辆调度控制台</title>
+    <link rel="stylesheet" href="/styles.css?v=20260919-interface-restore-1" />
+    <link rel="stylesheet" href="/valueco-day.css?v=20260915-vehicle-compliance-1" />
+    <link rel="stylesheet" href="/valueco-refined.css?v=20260915-feihong-console-static-route-1" />
+  </head>
+  <body class="permissions-page">
+    <div class="shell">
+      <header class="topbar">
+        <div><p class="eyebrow">ROLE ACCESS</p><div class="title-row"><h1>权限管理</h1><button id="languageToggle" class="language-toggle" type="button" aria-label="切换中英文">English</button><button id="themeToggle" class="theme-toggle" type="button">自动模式</button></div><p class="subtitle">先设置角色默认权限，再为单个账号做独立覆盖</p></div>
+        <div class="top-actions"><a class="button button-quiet" href="/accounts">账号管理</a><a class="button button-quiet" href="/?view=overview">返回桌面调度台</a><button id="logoutButton" class="button button-quiet" type="button">退出登录</button></div>
+      </header>
+      <main class="permissions-layout">
+        <section class="panel role-permission-panel">
+          <div class="panel-heading"><div><p class="eyebrow">ACCESS SCOPE</p><h2>权限对象</h2></div><p class="field-hint">先配置角色默认值，再进入个人覆盖为单个账号单独调整。</p></div>
+          <div class="permission-mode-switch"><button id="roleModeButton" class="button button-primary" type="button">角色默认</button><button id="accountModeButton" class="button button-quiet" type="button">个人覆盖</button></div>
+          <div id="roleList" class="role-list"><div class="empty-card">正在读取角色…</div></div>
+          <div id="accountList" class="role-list" hidden><div class="empty-card">正在读取账号…</div></div>
+        </section>
+        <section class="panel role-editor-panel">
+          <div class="panel-heading"><div><p class="eyebrow">PERMISSION EDITOR</p><h2 id="editorTitle">选择一个角色</h2><p id="editorHint" class="field-hint">从左侧选择角色，编辑该角色的默认权限。</p></div><button id="resetRoleButton" class="button button-quiet" type="button" hidden>恢复系统默认</button></div>
+          <div id="roleEditor" class="role-editor-content"><div class="empty-card">请选择左侧角色。</div></div>
+          <div class="permission-editor-footer"><p id="permissionNotice" class="account-status" role="status"></p><button id="saveRoleButton" class="button button-primary" type="button" disabled>保存角色权限</button></div>
+        </section>
+      </main>
+    </div>
+    <script src="/theme.js?v=20260916-guideline-fixes-1"></script>
+    <script src="/permissions.js?v=20260919-interface-restore-1" defer></script>
+  </body>
+</html>

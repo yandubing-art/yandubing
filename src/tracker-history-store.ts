@@ -75,6 +75,12 @@ function sampleLocations(entries: TrackerHistoryEntry[], maximum = 10): { locati
   return { locations: sampled.filter((location, index) => index === 0 || location !== sampled[index - 1]), pointCount: locations.length };
 }
 
+function preferHistoryEntry(current: TrackerHistoryEntry, candidate: TrackerHistoryEntry): TrackerHistoryEntry {
+  const currentNumbered = /\s*[（(]\s*\d+\s*[）)]\s*$/.test(current.registration);
+  const candidateNumbered = /\s*[（(]\s*\d+\s*[）)]\s*$/.test(candidate.registration);
+  return currentNumbered && !candidateNumbered ? candidate : current;
+}
+
 export class TrackerHistoryStore {
   private readonly directory: string;
   private readonly retentionDays: number;
@@ -146,6 +152,13 @@ export class TrackerHistoryStore {
         return [entry.registration, entry.alias, entry.vin, entry.location, entry.status]
           .some((value) => String(value || "").toLowerCase().includes(keyword));
       }).sort((left, right) => Date.parse(left.trackerTimestamp) - Date.parse(right.trackerTimestamp));
+      const uniqueEntries = new Map<string, TrackerHistoryEntry>();
+      for (const entry of dayEntries) {
+        const key = `${normalizeTrackerIdentifier(entry.registration)}|${entry.trackerTimestamp}`;
+        const previous = uniqueEntries.get(key);
+        uniqueEntries.set(key, previous ? preferHistoryEntry(previous, entry) : entry);
+      }
+      dayEntries.splice(0, dayEntries.length, ...uniqueEntries.values());
       if (options.order === "desc") dayEntries.reverse();
 
       for (const entry of dayEntries) {
