@@ -321,6 +321,10 @@ function defaultAuthenticatedTarget(req: Request): string {
   return isMobileRequest(req) ? "/?view=apply" : "/?view=overview";
 }
 
+function defaultEntryView(req: Request): "apply" | "overview" {
+  return isMobileRequest(req) ? "apply" : "overview";
+}
+
 function isDefaultEntryTarget(nextTarget: string): boolean {
   return nextTarget === "/" || nextTarget === "/index.html";
 }
@@ -521,15 +525,16 @@ app.get(["/", "/index.html"], (req, res) => {
   noStore(res);
   const principal = sessionPrincipal(req);
   if (!principal) {
-    const requestedView = typeof req.query.view === "string" ? req.query.view : "apply";
+    const requestedView = typeof req.query.view === "string" ? req.query.view : defaultEntryView(req);
     if (requestedView === "booking") {
       res.redirect(`/api/auth/lark/continue?next=${encodeURIComponent(req.originalUrl)}`);
       return;
     }
-    res.redirect(`/login?next=${encodeURIComponent(req.originalUrl)}`);
+    const loginPath = isMobileRequest(req) ? "/login" : "/admin-login";
+    res.redirect(`${loginPath}?next=${encodeURIComponent(req.originalUrl)}`);
     return;
   }
-  const requestedView = typeof req.query.view === "string" ? req.query.view : "apply";
+  const requestedView = typeof req.query.view === "string" ? req.query.view : defaultEntryView(req);
   if (!["apply", "departure", "transfer", "return", "overview", "booking", "history", "tracker-history", "settings", "vehicle-options", "edit", "vehicle", "vehicle-edit"].includes(requestedView)) {
     res.redirect("/?view=apply");
     return;
