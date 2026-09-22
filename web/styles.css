@@ -2741,6 +2741,22 @@ html[data-theme="night"] .vehicle-kicker::before { color:#9ed6ff; }
 .form-row > label > .field-hint {
   margin:0;
 }
+
+/* Align single-control fields even when only one side has helper copy. */
+.form-panel form > .form-grid > label:has(> input):not(:has(> select)):not(:has(> textarea)),
+.form-panel form > .form-grid > label:has(> select):not(:has(> input)):not(:has(> textarea)):not(:has(> .quick-select)),
+.form-panel form > .form-row > label:has(> input):not(:has(> select)):not(:has(> textarea)),
+.form-panel form > .form-row > label:has(> select):not(:has(> input)):not(:has(> textarea)):not(:has(> .quick-select)) {
+  grid-template-rows:auto 48px minmax(16px,auto);
+  align-content:start;
+}
+.form-panel form > .form-grid > label:has(> input):not(:has(> select)):not(:has(> textarea)) > input,
+.form-panel form > .form-grid > label:has(> select):not(:has(> input)):not(:has(> textarea)):not(:has(> .quick-select)) > select,
+.form-panel form > .form-row > label:has(> input):not(:has(> select)):not(:has(> textarea)) > input,
+.form-panel form > .form-row > label:has(> select):not(:has(> input)):not(:has(> textarea)):not(:has(> .quick-select)) > select {
+  height:48px;
+  min-height:48px;
+}
 @media (max-width:800px) and (min-width:651px) {
   .form-grid,
   .form-row { gap:12px; }
