@@ -1144,7 +1144,6 @@ export class LarkClient {
     const owner = input.owner.trim();
     const year = input.year.trim();
     if (!plate || !model) throw new Error("车牌和车型不能为空");
-    if (input.trackerRegistration.trim() && !vehicle.trackerRegistrationField) throw new Error("车辆档案表未配置 Tracker 匹配字段，请先增加 Tracker 文本字段");
     const fields: Record<string, unknown> = {
       [vehicle.plateField]: plate,
       [vehicle.modelField]: model
@@ -1347,9 +1346,6 @@ export class LarkClient {
       }
       return undefined;
     };
-    if (input.trackerRegistration.trim() && !matchingField(config.vehicleFields.tracker)) {
-      throw new Error("车辆档案表未配置 Tracker 匹配字段，请先增加 Tracker 文本字段");
-    }
     const write = (names: readonly string[], value: string | number | null): void => {
       if (value === null || value === "") return;
       const field = matchingField(names);

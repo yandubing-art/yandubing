@@ -1,6 +1,10 @@
 (() => {
   const params = new URLSearchParams(window.location.search);
-  const safeNext = (value) => value && value.startsWith("/") && !value.startsWith("//") ? value : "/?view=apply";
+  const defaultNext = window.matchMedia("(min-width: 701px)").matches ? "/?view=overview" : "/?view=apply";
+  const safeNext = (value) => {
+    if (value === "/" || value === "/index.html" || !value) return defaultNext;
+    return value.startsWith("/") && !value.startsWith("//") ? value : defaultNext;
+  };
   const phoneLanguages = Array.isArray(navigator.languages) && navigator.languages.length ? navigator.languages : [navigator.language || "en"];
   const browserLanguage = phoneLanguages.some((language) => /^zh(?:-|$)/i.test(String(language))) ? "zh" : "en";
   const languageOverride = sessionStorage.getItem("dispatch_language_override_v2");

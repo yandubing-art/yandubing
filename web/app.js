@@ -220,6 +220,7 @@
     "请先连接后端。": "Connect to the backend first.", "请输入后端令牌。": "Enter the backend token.", "请输入后端令牌后连接。": "Enter the backend token, then connect.", "请选择驾驶人": "Select a driver", "输入姓名或英文名匹配": "Type a name or English name to match", "输入姓名或英文名，系统会自动匹配公司人员": "Type a name or English name; the system matches a company person", "已匹配：": "Matched: ", "未匹配到公司人员，请从建议中选择": "No company person matched; choose from the suggestions", "照片": "Photo", "张照片已准备，提交时上传。": "photos ready to upload on submission.", "请补齐前、后、左、右四张照片；补充照片为选填。": "Add front, rear, left and right photos; the extra photo is optional.", "正在读取多维表格…": "Loading Base…", "正在执行同步…": "Syncing…", "读取失败：": "Load failed: ", "同步失败：": "Sync failed: ", "保存失败：": "Save failed: ", "处理照片失败：": "Photo processing failed: ", "无法读取图片": "Unable to read the image", "图片压缩失败": "Image compression failed", "图片转换失败": "Image conversion failed"
   };
   zhToEn["进入 Tracker 官方车辆定位平台查看已关联车辆。当前未接入 Tracker 官方 API，因此不会伪造单车定位参数。"] = "Open the official Tracker vehicle location platform to view linked vehicles. The Tracker official API is not connected, so no per-vehicle parameters are fabricated.";
+  zhToEn["已自动关联 Tracker 实时数据；车辆档案表未配置可写 Tracker 字段，当前不会回写编号。"] = "Live Tracker data is linked automatically; the vehicle table has no writable Tracker field, so the registration will not be written back.";
   Object.assign(zhToEn, {
     "Tracker 位置": "Tracker location",
     "在地图中查看": "View on map",
@@ -1491,10 +1492,10 @@
     select.innerHTML = `<option value="">${escapeHtml(t("自动按 VIN / 车牌匹配"))}</option>${options.map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join("")}`;
     select.value = current;
     const canPersist = state.creatingVehicle || Boolean(vehicle?.trackerRegistrationField);
-    select.disabled = !canPersist;
+    select.disabled = false;
     if (hint) {
       hint.textContent = !canPersist
-        ? t("车辆档案表未配置 Tracker 匹配字段；请先增加 Tracker 文本字段。")
+        ? t("已自动关联 Tracker 实时数据；车辆档案表未配置可写 Tracker 字段，当前不会回写编号。")
         : options.length
           ? automaticRegistration && !vehicle?.trackerRegistration
             ? t("已按车牌/VIN自动关联 Tracker；保存后会写回这个编号。")
