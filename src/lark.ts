@@ -983,6 +983,8 @@ export class LarkClient {
         const registerNumberField = findField(record.fields, config.vehicleFields.registerNumber);
         const vehicleIdentificationNumberField = findField(record.fields, config.vehicleFields.vehicleIdentificationNumber);
         const trackerRegistrationField = findField(record.fields, config.vehicleFields.tracker);
+        const trackerFieldDefinition = tableFields[tableIndex].find((field) => config.vehicleFields.tracker.some((name) => lookupKey(name) === lookupKey(field.name)));
+        const resolvedTrackerField = trackerRegistrationField || (trackerFieldDefinition ? { name: trackerFieldDefinition.name, value: "" } : undefined);
         const certificateExpiryField = findField(record.fields, config.vehicleFields.certificateExpiry);
         const logBookField = findField(record.fields, config.vehicleFields.logBook);
         const policyNumberField = findField(record.fields, config.vehicleFields.policyNumber);
@@ -1027,8 +1029,8 @@ export class LarkClient {
           registerNumberField: registerNumberField?.name || "",
           vehicleIdentificationNumber: textValue(vehicleIdentificationNumberField?.value),
           vehicleIdentificationNumberField: vehicleIdentificationNumberField?.name || "",
-          trackerRegistration: textValue(trackerRegistrationField?.value),
-          trackerRegistrationField: trackerRegistrationField?.name || "",
+          trackerRegistration: textValue(resolvedTrackerField?.value),
+          trackerRegistrationField: resolvedTrackerField?.name || "",
           certificateExpiry: textValue(certificateExpiryField?.value),
           certificateExpiryField: certificateExpiryField?.name || "",
           logBookAttachments,
@@ -1041,7 +1043,7 @@ export class LarkClient {
           fnbFleetCardField: fnbFleetCardField?.name || "",
           fleetCardPhotoUrl: fleetCardPhotos[0]?.url || "",
           fleetCardPhotoField: fleetCardPhotoField?.name || "",
-          selectFieldNames: [brandField, typeField, statusField, ownerField, yearField, registeringAuthorityField, insuranceField, trackerRegistrationField].filter((field): field is { name: string; value: unknown } => Boolean(field && Array.isArray(field.value))).map((field) => field.name),
+          selectFieldNames: [brandField, typeField, statusField, ownerField, yearField, registeringAuthorityField, insuranceField, resolvedTrackerField].filter((field): field is { name: string; value: unknown } => Boolean(field && Array.isArray(field.value))).map((field) => field.name),
           dispatchEligible: dispatchEligibility(plate, model, status),
           photoUrl: photos[0]?.url || "",
           photoFileToken: photos[0]?.fileToken,
