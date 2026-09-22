@@ -222,9 +222,23 @@ node dist/tracker-sync.js --once
 
 ### Tracker 每日报表邮箱同步
 
-如果 Tracker 将 `Trip Report (Detail)` 按天以 CSV 附件发送到专用 Gmail，后台可以从 Gmail IMAP 读取最新附件。生产环境配置 `TRACKER_REPORT_EMAIL_ENABLED=true`、邮箱账号和应用专用密码后，worker 默认每天服务器时间 02:00 检查一次；没有新文件时每 30 分钟重试，最晚到 06:00。成功后保存 CSV 和解析结果，按邮件 ID 与文件哈希去重。邮箱读取使用只读 IMAP，不删除或标记邮件。
+如果 Tracker 将 `Trip Report (Detail)` 按天以 CSV 附件发送到专用 Gmail，后台可以通过 Gmail OAuth2 + IMAP 读取最新附件。生产环境配置 `TRACKER_REPORT_EMAIL_ENABLED=true`、邮箱账号、OAuth 客户端 ID、客户端密钥和刷新令牌后，worker 默认每天服务器时间 02:00 检查一次；没有新文件时每 30 分钟重试，最晚到 06:00。成功后保存 CSV 和解析结果，按邮件 ID 与文件哈希去重。邮箱读取使用只读 IMAP，不删除或标记邮件。OAuth 授权范围必须包含 `https://mail.google.com/`，不使用 Gmail 普通登录密码。
 
-解析使用 `Reg`、`ReportStart`、`ReportEnd`、`VehOdometerStart` 和 `VehOdometerEnd`；同一车辆的结束公里数出现冲突时保留报表但标记为不一致，不进入自动补写。邮箱密码只保存在服务器环境变量，不提交到 Git。
+首次授权流程：
+
+1. 在 Google Cloud Console 创建项目，配置 OAuth consent screen，将 `Valuecoreport@gmail.com` 加入测试用户，并创建 OAuth Client ID（Desktop app）；同时启用 Gmail API。
+2. 在本地 PowerShell 设置客户端信息并运行授权脚本。脚本会打开 Google 授权页，授权账号必须是 `Valuecoreport@gmail.com`：
+
+```powershell
+$env:GMAIL_OAUTH_CLIENT_ID="你的客户端ID"
+$env:GMAIL_OAUTH_CLIENT_SECRET="你的客户端密钥"
+$env:TRACKER_REPORT_EMAIL_USER="Valuecoreport@gmail.com"
+npm run gmail:oauth
+```
+
+3. 将脚本输出的 `GMAIL_OAUTH_REFRESH_TOKEN` 配置到服务器的 `TRACKER_REPORT_EMAIL_REFRESH_TOKEN`。客户端密钥和刷新令牌只放服务器环境变量，不提交 Git。
+
+解析使用 `Reg`、`ReportStart`、`ReportEnd`、`VehOdometerStart` 和 `VehOdometerEnd`；同一车辆的结束公里数出现冲突时保留报表但标记为不一致，不进入自动补写。OAuth 客户端密钥和刷新令牌只保存在服务器环境变量，不提交到 Git。
 
 生产默认读取 Tracker 实时车辆列表，每 5 分钟更新一次 `data/tracker-status.json`，不开放额外端口。PDF 报表下载默认关闭；只有确认目标账户的下载流程稳定并确实需要刷新 VIN、设备号或里程时，才设置 `TRACKER_REPORT_DOWNLOAD_ENABLED=true`。
 

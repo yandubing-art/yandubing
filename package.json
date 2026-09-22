@@ -9,7 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "tracker:dev": "tsx src/tracker-sync.ts",
-    "tracker:start": "node dist/tracker-sync.js"
+    "tracker:start": "node dist/tracker-sync.js",
+    "gmail:oauth": "node scripts/gmail-oauth.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

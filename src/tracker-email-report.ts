@@ -143,6 +143,31 @@ function mailError(error: unknown): string {
   return [message, code, response].filter(Boolean).join("; ");
 }
 
+async function getGmailAccessToken(): Promise<string> {
+  if (config.trackerReportEmailAuthMode !== "oauth2") {
+    throw new Error(`Unsupported tracker report email auth mode: ${config.trackerReportEmailAuthMode}`);
+  }
+  if (!config.trackerReportEmailClientId || !config.trackerReportEmailClientSecret || !config.trackerReportEmailRefreshToken) {
+    throw new Error("Gmail OAuth2 is enabled but client ID, client secret, or refresh token is missing");
+  }
+  const response = await fetch(config.trackerReportEmailTokenEndpoint, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: config.trackerReportEmailClientId,
+      client_secret: config.trackerReportEmailClientSecret,
+      refresh_token: config.trackerReportEmailRefreshToken,
+      grant_type: "refresh_token"
+    })
+  });
+  const payload = await response.json().catch(() => ({})) as { access_token?: unknown; error?: unknown; error_description?: unknown };
+  if (!response.ok || typeof payload.access_token !== "string" || !payload.access_token) {
+    const detail = [payload.error, payload.error_description].filter(Boolean).join(": ") || response.statusText;
+    throw new Error(`Gmail OAuth2 token refresh failed: ${detail}`);
+  }
+  return payload.access_token;
+}
+
 export async function syncLatestTrackerEmailReport(
   runDate: string,
   store = new TrackerEmailReportStore()
@@ -150,22 +175,23 @@ export async function syncLatestTrackerEmailReport(
   if (!config.trackerReportEmailEnabled) {
     return { status: "skipped", message: "Tracker email report sync is disabled", records: 0 };
   }
-  if (!config.trackerReportEmailUser || !config.trackerReportEmailPassword) {
-    return { status: "skipped", message: "Tracker email report credentials are not configured", records: 0 };
+  if (!config.trackerReportEmailUser) {
+    return { status: "skipped", message: "Tracker email report user is not configured", records: 0 };
   }
 
   store.beginAttempt(runDate);
   const reportDirectory = path.resolve(config.trackerReportEmailDirectory);
   fs.mkdirSync(reportDirectory, { recursive: true });
-  const client = new ImapFlow({
-    host: config.trackerReportEmailHost,
-    port: config.trackerReportEmailPort,
-    secure: true,
-    auth: { user: config.trackerReportEmailUser, pass: config.trackerReportEmailPassword },
-    logger: false
-  });
-
+  let client: ImapFlow | null = null;
   try {
+    const accessToken = await getGmailAccessToken();
+    client = new ImapFlow({
+      host: config.trackerReportEmailHost,
+      port: config.trackerReportEmailPort,
+      secure: true,
+      auth: { user: config.trackerReportEmailUser, accessToken },
+      logger: false
+    });
     await client.connect();
     const lock = await client.getMailboxLock(config.trackerReportEmailMailbox, { readOnly: true });
     try {
@@ -216,7 +242,7 @@ export async function syncLatestTrackerEmailReport(
     store.writeFailure(detail);
     throw new Error(`Tracker email report sync failed: ${detail}`);
   } finally {
-    await client.logout().catch(() => undefined);
+    await client?.logout().catch(() => undefined);
   }
 }
 
