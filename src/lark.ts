@@ -127,6 +127,7 @@ type VehicleProfileInput = {
   spareKey: string;
   registerNumber: string;
   vehicleIdentificationNumber: string;
+  trackerRegistration: string;
   certificateExpiry: string;
   logBookDocument?: { fileName: string; dataUrl: string };
   policyNumber: string;
@@ -981,6 +982,7 @@ export class LarkClient {
         const spareKeyField = findField(record.fields, config.vehicleFields.spareKey);
         const registerNumberField = findField(record.fields, config.vehicleFields.registerNumber);
         const vehicleIdentificationNumberField = findField(record.fields, config.vehicleFields.vehicleIdentificationNumber);
+        const trackerRegistrationField = findField(record.fields, config.vehicleFields.tracker);
         const certificateExpiryField = findField(record.fields, config.vehicleFields.certificateExpiry);
         const logBookField = findField(record.fields, config.vehicleFields.logBook);
         const policyNumberField = findField(record.fields, config.vehicleFields.policyNumber);
@@ -1025,6 +1027,8 @@ export class LarkClient {
           registerNumberField: registerNumberField?.name || "",
           vehicleIdentificationNumber: textValue(vehicleIdentificationNumberField?.value),
           vehicleIdentificationNumberField: vehicleIdentificationNumberField?.name || "",
+          trackerRegistration: textValue(trackerRegistrationField?.value),
+          trackerRegistrationField: trackerRegistrationField?.name || "",
           certificateExpiry: textValue(certificateExpiryField?.value),
           certificateExpiryField: certificateExpiryField?.name || "",
           logBookAttachments,
@@ -1037,7 +1041,7 @@ export class LarkClient {
           fnbFleetCardField: fnbFleetCardField?.name || "",
           fleetCardPhotoUrl: fleetCardPhotos[0]?.url || "",
           fleetCardPhotoField: fleetCardPhotoField?.name || "",
-          selectFieldNames: [brandField, typeField, statusField, ownerField, yearField, registeringAuthorityField, insuranceField].filter((field): field is { name: string; value: unknown } => Boolean(field && Array.isArray(field.value))).map((field) => field.name),
+          selectFieldNames: [brandField, typeField, statusField, ownerField, yearField, registeringAuthorityField, insuranceField, trackerRegistrationField].filter((field): field is { name: string; value: unknown } => Boolean(field && Array.isArray(field.value))).map((field) => field.name),
           dispatchEligible: dispatchEligibility(plate, model, status),
           photoUrl: photos[0]?.url || "",
           photoFileToken: photos[0]?.fileToken,
@@ -1138,6 +1142,7 @@ export class LarkClient {
     const owner = input.owner.trim();
     const year = input.year.trim();
     if (!plate || !model) throw new Error("车牌和车型不能为空");
+    if (input.trackerRegistration.trim() && !vehicle.trackerRegistrationField) throw new Error("车辆档案表未配置 Tracker 匹配字段，请先增加 Tracker 文本字段");
     const fields: Record<string, unknown> = {
       [vehicle.plateField]: plate,
       [vehicle.modelField]: model
@@ -1161,6 +1166,12 @@ export class LarkClient {
     writeTextField(vehicle.spareKeyField, input.spareKey.trim());
     writeTextField(vehicle.registerNumberField, input.registerNumber.trim());
     writeTextField(vehicle.vehicleIdentificationNumberField, input.vehicleIdentificationNumber.trim());
+    const trackerRegistration = input.trackerRegistration.trim();
+    if (vehicle.trackerRegistrationField && trackerRegistration !== vehicle.trackerRegistration) {
+      fields[vehicle.trackerRegistrationField] = vehicle.selectFieldNames.includes(vehicle.trackerRegistrationField)
+        ? (trackerRegistration ? [trackerRegistration] : [])
+        : trackerRegistration;
+    }
     writeTextField(vehicle.certificateExpiryField, input.certificateExpiry.trim());
     writeTextField(vehicle.policyNumberField, input.policyNumber.trim());
     const insurance = input.insurance.trim();
@@ -1240,6 +1251,7 @@ export class LarkClient {
       spareKey: input.spareKey.trim() || vehicle.spareKey,
       registerNumber: input.registerNumber.trim() || vehicle.registerNumber,
       vehicleIdentificationNumber: input.vehicleIdentificationNumber.trim() || vehicle.vehicleIdentificationNumber,
+      trackerRegistration: trackerRegistration || vehicle.trackerRegistration,
       certificateExpiry: input.certificateExpiry.trim() || vehicle.certificateExpiry,
       logBookAttachments,
       policyNumber: input.policyNumber.trim() || vehicle.policyNumber,
@@ -1312,6 +1324,7 @@ export class LarkClient {
           [config.vehicleFields.status[0]]: input.status.trim() || "Sold",
           [config.vehicleFields.owner[0]]: input.owner.trim(),
           [config.vehicleFields.year[0]]: input.year.trim(),
+          [config.vehicleFields.tracker[0]]: input.trackerRegistration.trim(),
           [config.vehicleFields.mileage[0]]: input.mileage ?? "",
           [config.vehicleFields.nextMaintenanceMileage[0]]: input.nextMaintenanceMileage ?? "",
           [config.vehicleFields.nextMaintenanceDate[0]]: input.nextMaintenanceDate ? dateTimeCellValue(input.nextMaintenanceDate) : ""
@@ -1332,6 +1345,9 @@ export class LarkClient {
       }
       return undefined;
     };
+    if (input.trackerRegistration.trim() && !matchingField(config.vehicleFields.tracker)) {
+      throw new Error("车辆档案表未配置 Tracker 匹配字段，请先增加 Tracker 文本字段");
+    }
     const write = (names: readonly string[], value: string | number | null): void => {
       if (value === null || value === "") return;
       const field = matchingField(names);
@@ -1351,6 +1367,7 @@ export class LarkClient {
     write(config.vehicleFields.spareKey, input.spareKey.trim());
     write(config.vehicleFields.registerNumber, input.registerNumber.trim());
     write(config.vehicleFields.vehicleIdentificationNumber, input.vehicleIdentificationNumber.trim());
+    write(config.vehicleFields.tracker, input.trackerRegistration.trim());
     write(config.vehicleFields.certificateExpiry, input.certificateExpiry.trim());
     if (input.logBookDocument) {
       const logBookField = matchingField(config.vehicleFields.logBook);

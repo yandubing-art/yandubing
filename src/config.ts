@@ -142,6 +142,7 @@ function buildConfig() {
     spareKey: listEnv("VEHICLE_SPARE_KEY_FIELDS", "Spare Key | 备用钥匙,Spare Key,备用钥匙"),
     registerNumber: listEnv("VEHICLE_REGISTER_NUMBER_FIELDS", "Register number | 注册号,Register number,注册号"),
     vehicleIdentificationNumber: listEnv("VEHICLE_IDENTIFICATION_NUMBER_FIELDS", "Vehicle identification number | 车辆ID,Vehicle identification number,车辆ID"),
+    tracker: listEnv("VEHICLE_TRACKER_FIELDS", "Tracker | Tracker匹配,Tracker,Tracker Registration,Tracker编号,Tracker车牌,追踪器,追踪器编号"),
     certificateExpiry: listEnv("VEHICLE_CERTIFICATE_EXPIRY_FIELDS", "Certificate Expiry | 证书有效期,Certificate Expiry,证书有效期"),
     logBook: listEnv("VEHICLE_LOG_BOOK_FIELDS", "log book | 车辆登记证书,log book,车辆登记证书,车辆大本,大本"),
     policyNumber: listEnv("VEHICLE_POLICY_NUMBER_FIELDS", "Policy Number | 保单号,Policy Number,保单号"),

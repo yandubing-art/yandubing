@@ -173,7 +173,17 @@ function trackerStatusFor(principal: RequestPrincipal, vehicles: VehicleProfile[
       nextEligibleAt,
       lastCompletedAt: state.lastRefreshCompletedAt
     },
-    ...(principal.permissions.includes("manage_vehicles") ? { audit: state.audit.slice(-20) } : {})
+    ...(principal.permissions.includes("manage_vehicles") ? {
+      trackers: state.records.map((record) => ({
+        registration: record.registration,
+        alias: record.alias,
+        vin: record.vin,
+        unitSerialNumber: record.unitSerialNumber,
+        trackerTimestamp: record.trackerTimestamp,
+        status: record.status || ""
+      })),
+      audit: state.audit.slice(-20)
+    } : {})
   };
 }
 
@@ -1250,6 +1260,7 @@ app.post("/api/vehicles", requirePermission("manage_vehicles"), async (req, res,
       spareKey: typeof body.spareKey === "string" ? body.spareKey : "",
       registerNumber: typeof body.registerNumber === "string" ? body.registerNumber : "",
       vehicleIdentificationNumber: typeof body.vehicleIdentificationNumber === "string" ? body.vehicleIdentificationNumber : "",
+      trackerRegistration: typeof body.trackerRegistration === "string" ? body.trackerRegistration : "",
       certificateExpiry: typeof body.certificateExpiry === "string" ? body.certificateExpiry : "",
       logBookDocument,
       policyNumber: typeof body.policyNumber === "string" ? body.policyNumber : "",
@@ -1300,6 +1311,7 @@ app.patch("/api/vehicles/:tableId/:recordId", requirePermission("manage_vehicles
       spareKey: typeof body.spareKey === "string" ? body.spareKey : "",
       registerNumber: typeof body.registerNumber === "string" ? body.registerNumber : "",
       vehicleIdentificationNumber: typeof body.vehicleIdentificationNumber === "string" ? body.vehicleIdentificationNumber : "",
+      trackerRegistration: typeof body.trackerRegistration === "string" ? body.trackerRegistration : "",
       certificateExpiry: typeof body.certificateExpiry === "string" ? body.certificateExpiry : "",
       logBookDocument,
       policyNumber: typeof body.policyNumber === "string" ? body.policyNumber : "",

@@ -93,6 +93,8 @@ export type VehicleProfile = {
   registerNumberField: string;
   vehicleIdentificationNumber: string;
   vehicleIdentificationNumberField: string;
+  trackerRegistration: string;
+  trackerRegistrationField: string;
   certificateExpiry: string;
   certificateExpiryField: string;
   logBookAttachments: Array<{ name: string; url: string; fileToken?: string }>;

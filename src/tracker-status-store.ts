@@ -64,7 +64,7 @@ export type TrackerVehicleMatch = {
   tableId: string;
   recordId: string;
   status: "matched" | "unmatched" | "pending_confirmation";
-  reason: "vin" | "plate" | "not_found" | "duplicate_vin" | "duplicate_plate" | "vin_conflict";
+  reason: "tracker" | "vin" | "plate" | "not_found" | "duplicate_vin" | "duplicate_plate" | "vin_conflict";
   snapshot?: TrackerVehicleSnapshot;
 };
 
@@ -120,12 +120,18 @@ export function trackerVehicleKey(vehicle: { tableId: string; recordId: string }
 
 export function matchTrackerVehicle(
   records: TrackerVehicleSnapshot[],
-  vehicle: { tableId: string; recordId: string; plate?: string; vehicleIdentificationNumber?: string }
+  vehicle: { tableId: string; recordId: string; plate?: string; vehicleIdentificationNumber?: string; trackerRegistration?: string }
 ): TrackerVehicleMatch {
   const base = { vehicleKey: trackerVehicleKey(vehicle), tableId: vehicle.tableId, recordId: vehicle.recordId };
   const uniqueRecords = deduplicateTrackerRecords(records);
+  const trackerRegistration = normalizeTrackerIdentifier(vehicle.trackerRegistration);
   const vin = normalizeTrackerIdentifier(vehicle.vehicleIdentificationNumber);
   const plate = normalizeTrackerIdentifier(vehicle.plate);
+  if (trackerRegistration) {
+    const explicitMatches = uniqueRecords.filter((record) => normalizeTrackerIdentifier(record.registration) === trackerRegistration);
+    if (explicitMatches.length === 1) return { ...base, status: "matched", reason: "tracker", snapshot: explicitMatches[0] };
+    return { ...base, status: "unmatched", reason: "not_found" };
+  }
   const plateMatches = plate ? uniqueRecords.filter((record) => normalizeTrackerIdentifier(record.registration) === plate) : [];
   if (plateMatches.length > 1) return { ...base, status: "pending_confirmation", reason: "duplicate_plate" };
   if (vin) {
@@ -143,7 +149,7 @@ export function matchTrackerVehicle(
 
 export function matchTrackerSnapshot(
   records: TrackerVehicleSnapshot[],
-  vehicle: { plate?: string; vehicleIdentificationNumber?: string }
+  vehicle: { plate?: string; vehicleIdentificationNumber?: string; trackerRegistration?: string }
 ): TrackerVehicleSnapshot | undefined {
   return matchTrackerVehicle(records, { tableId: "", recordId: "", ...vehicle }).snapshot;
 }
