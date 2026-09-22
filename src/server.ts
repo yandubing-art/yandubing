@@ -313,8 +313,20 @@ function safeNext(value: unknown): string {
   return target.startsWith("/") && !target.startsWith("//") ? target : "/?view=apply";
 }
 
-function larkLoginRedirect(nextTarget: string): string {
-  if (nextTarget === "/" || nextTarget === "/index.html" || nextTarget === "/?view=overview") return "/?view=apply";
+function isMobileRequest(req: Request): boolean {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(req.get("user-agent") || "");
+}
+
+function defaultAuthenticatedTarget(req: Request): string {
+  return isMobileRequest(req) ? "/?view=apply" : "/?view=overview";
+}
+
+function isDefaultEntryTarget(nextTarget: string): boolean {
+  return nextTarget === "/" || nextTarget === "/index.html";
+}
+
+function larkLoginRedirect(req: Request, nextTarget: string): string {
+  if (isDefaultEntryTarget(nextTarget)) return defaultAuthenticatedTarget(req);
   return nextTarget;
 }
 
@@ -552,7 +564,7 @@ app.post("/api/auth/login", (req, res) => {
     return;
   }
   const requested = safeNext(req.body?.next);
-  const redirect = requested === "/" && !principal.permissions.includes("desktop_console") ? "/?view=apply" : requested;
+  const redirect = isDefaultEntryTarget(requested) ? defaultAuthenticatedTarget(req) : requested;
   finishLogin(res, principal, redirect);
 });
 
@@ -589,7 +601,7 @@ app.post("/api/auth/logout", (req, res) => {
 });
 
 app.get("/api/auth/lark/continue", (req, res) => {
-  const nextTarget = larkLoginRedirect(safeNext(req.query.next));
+  const nextTarget = larkLoginRedirect(req, safeNext(req.query.next));
   if (sessionPrincipal(req)) {
     res.redirect(nextTarget);
     return;
@@ -608,7 +620,7 @@ app.get("/api/auth/lark/start", (req, res) => {
   }
   pruneOAuthStates();
   const adminLogin = req.query.admin === "1" || req.query.admin === "true";
-  const nextTarget = safeNext(req.query.next);
+  const nextTarget = larkLoginRedirect(req, safeNext(req.query.next));
   const state = crypto.randomBytes(32).toString("base64url");
   oauthStates.set(state, { next: nextTarget, expiresAt: Date.now() + 10 * 60 * 1000, purpose: "login", admin: adminLogin });
   console.info("Lark OAuth start", { next: nextTarget, redirectUri: config.larkOAuthRedirectUri });
@@ -736,7 +748,7 @@ app.get("/api/auth/lark/callback", async (req, res) => {
     const session = authStore.createSession(principal);
     const maxAge = Math.max(1, Math.floor((session.expiresAt - Date.now()) / 1000));
     res.setHeader("Set-Cookie", sessionCookie(session.token, maxAge));
-    res.redirect(stateData.admin ? (stateData.next === "/" ? "/?view=overview" : stateData.next) : larkLoginRedirect(stateData.next));
+    res.redirect(stateData.admin ? (isDefaultEntryTarget(stateData.next) ? "/?view=overview" : stateData.next) : larkLoginRedirect(req, stateData.next));
   } catch (error) {
     const message = authErrorMessage(error instanceof Error ? error.message : error);
     if (isPhotoSync) console.warn("Lark photo-sync OAuth callback failed:", message);
