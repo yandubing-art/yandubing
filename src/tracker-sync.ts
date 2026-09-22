@@ -6,14 +6,52 @@ import { config } from "./config.js";
 import { readTrackerVehicleList } from "./tracker-live.js";
 import { TrackerHistoryStore } from "./tracker-history-store.js";
 import { deduplicateTrackerRecords, TrackerStatusStore } from "./tracker-status-store.js";
+import { cleanupTrackerEmailReports, syncLatestTrackerEmailReport, TrackerEmailReportStore } from "./tracker-email-report.js";
 
 const statusStore = new TrackerStatusStore();
 const historyStore = new TrackerHistoryStore();
+const emailReportStore = new TrackerEmailReportStore();
 let stopping = false;
 let activeContext: BrowserContext | null = null;
+let emailSyncRunning = false;
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function localDateKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function emailReportDue(now = new Date()): boolean {
+  if (!config.trackerReportEmailEnabled) return false;
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const start = config.trackerReportEmailRunHour * 60 + config.trackerReportEmailRunMinute;
+  const end = 6 * 60;
+  if (minutes < start || minutes > end) return false;
+  const runDate = localDateKey(now);
+  const state = emailReportStore.read();
+  if (state.lastSuccessRunDate === runDate) return false;
+  const lastAttempt = Date.parse(state.lastAttemptAt || "");
+  return !Number.isFinite(lastAttempt) || Date.now() - lastAttempt >= 30 * 60 * 1000;
+}
+
+async function syncEmailReportIfDue(): Promise<void> {
+  if (emailSyncRunning || !emailReportDue()) return;
+  emailSyncRunning = true;
+  const runDate = localDateKey();
+  try {
+    cleanupTrackerEmailReports();
+    const result = await syncLatestTrackerEmailReport(runDate, emailReportStore);
+    console.log("Tracker email report check", { runDate, ...result });
+  } catch (error) {
+    console.warn("Tracker email report check failed", { runDate, error: message(error) });
+  } finally {
+    emailSyncRunning = false;
+  }
 }
 
 function resolveBrowserExecutable(): string {
@@ -305,6 +343,7 @@ async function runLoop(): Promise<void> {
       delay = config.trackerRetryIntervalMs;
       console.error("Tracker synchronization failed", { consecutiveFailures, error: message(error) });
     }
+    await syncEmailReportIfDue();
   }
 }
 
@@ -325,6 +364,11 @@ async function waitForNextRun(delayMs: number): Promise<string | undefined> {
 }
 
 async function main(): Promise<void> {
+  if (process.argv.includes("--email-once")) {
+    const result = await syncLatestTrackerEmailReport(localDateKey(), emailReportStore);
+    console.log("Tracker email report check", result);
+    return;
+  }
   const reportIndex = process.argv.indexOf("--report");
   if (reportIndex >= 0) {
     const filePath = process.argv[reportIndex + 1];

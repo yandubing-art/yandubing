@@ -10,6 +10,26 @@ function integer(name: string, fallback: number): number {
   return value;
 }
 
+function clockHour(name: string, fallback: number): number {
+  const raw = runtimeEnvironment[name]?.trim();
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0 || value > 23) {
+    throw new Error(`${name} must be an integer from 0 to 23`);
+  }
+  return value;
+}
+
+function clockMinute(name: string, fallback: number): number {
+  const raw = runtimeEnvironment[name]?.trim();
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0 || value > 59) {
+    throw new Error(`${name} must be an integer from 0 to 59`);
+  }
+  return value;
+}
+
 function boolean(name: string, fallback: boolean): boolean {
   const raw = runtimeEnvironment[name]?.trim().toLowerCase();
   if (!raw) return fallback;
@@ -77,6 +97,18 @@ function buildConfig() {
   trackerErrorScreenshotPath: runtimeEnvironment.TRACKER_ERROR_SCREENSHOT_PATH?.trim() || "",
   trackerHeadless: boolean("TRACKER_HEADLESS", true),
   trackerReportDownloadEnabled: boolean("TRACKER_REPORT_DOWNLOAD_ENABLED", false),
+  trackerReportEmailEnabled: boolean("TRACKER_REPORT_EMAIL_ENABLED", false),
+  trackerReportEmailHost: runtimeEnvironment.TRACKER_REPORT_EMAIL_HOST?.trim() || "imap.gmail.com",
+  trackerReportEmailPort: integer("TRACKER_REPORT_EMAIL_PORT", 993),
+  trackerReportEmailUser: runtimeEnvironment.TRACKER_REPORT_EMAIL_USER?.trim() || "",
+  trackerReportEmailPassword: runtimeEnvironment.TRACKER_REPORT_EMAIL_PASSWORD || "",
+  trackerReportEmailMailbox: runtimeEnvironment.TRACKER_REPORT_EMAIL_MAILBOX?.trim() || "INBOX",
+  trackerReportEmailSubject: runtimeEnvironment.TRACKER_REPORT_EMAIL_SUBJECT?.trim() || "Trip Report (Detail)",
+  trackerReportEmailDirectory: runtimeEnvironment.TRACKER_REPORT_EMAIL_DIRECTORY?.trim() || "./data/tracker-email-reports",
+  trackerReportEmailStatePath: runtimeEnvironment.TRACKER_REPORT_EMAIL_STATE_PATH?.trim() || "./data/tracker-email-report.json",
+  trackerReportEmailRunHour: clockHour("TRACKER_REPORT_EMAIL_RUN_HOUR", 2),
+  trackerReportEmailRunMinute: clockMinute("TRACKER_REPORT_EMAIL_RUN_MINUTE", 0),
+  trackerReportEmailLookbackDays: integer("TRACKER_REPORT_EMAIL_LOOKBACK_DAYS", 7),
   trackerSyncIntervalMs: integer("TRACKER_SYNC_INTERVAL_SECONDS", 300) * 1000,
   trackerActiveSyncIntervalMs: integer("TRACKER_ACTIVE_SYNC_INTERVAL_SECONDS", 300) * 1000,
   trackerMinimumSyncIntervalMs: integer("TRACKER_MIN_SYNC_INTERVAL_SECONDS", 300) * 1000,

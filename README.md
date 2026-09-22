@@ -220,6 +220,12 @@ $env:TRACKER_SYNC_ENABLED="true"
 node dist/tracker-sync.js --once
 ```
 
+### Tracker 每日报表邮箱同步
+
+如果 Tracker 将 `Trip Report (Detail)` 按天以 CSV 附件发送到专用 Gmail，后台可以从 Gmail IMAP 读取最新附件。生产环境配置 `TRACKER_REPORT_EMAIL_ENABLED=true`、邮箱账号和应用专用密码后，worker 默认每天服务器时间 02:00 检查一次；没有新文件时每 30 分钟重试，最晚到 06:00。成功后保存 CSV 和解析结果，按邮件 ID 与文件哈希去重。邮箱读取使用只读 IMAP，不删除或标记邮件。
+
+解析使用 `Reg`、`ReportStart`、`ReportEnd`、`VehOdometerStart` 和 `VehOdometerEnd`；同一车辆的结束公里数出现冲突时保留报表但标记为不一致，不进入自动补写。邮箱密码只保存在服务器环境变量，不提交到 Git。
+
 生产默认读取 Tracker 实时车辆列表，每 5 分钟更新一次 `data/tracker-status.json`，不开放额外端口。PDF 报表下载默认关闭；只有确认目标账户的下载流程稳定并确实需要刷新 VIN、设备号或里程时，才设置 `TRACKER_REPORT_DOWNLOAD_ENABLED=true`。
 
 - 车辆总览以 Tracker 返回的车辆实际状态替代车辆档案中的使用状态，并同时显示 Tracker 更新状态；车辆档案使用状态仍保留在档案详情和编辑界面。点击“车辆位置状态”后，在独立二级菜单中显示最后位置、车辆实际状态、Tracker 里程、数据时间和同步状态。
