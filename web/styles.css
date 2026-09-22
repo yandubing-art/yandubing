@@ -2714,3 +2714,34 @@ html[data-theme="night"] .vehicle-kicker::before { color:#9ed6ff; }
 .maintenance-form .form-grid > label > .field-hint {
   min-height:16px;
 }
+
+/* Shared two-column form geometry: equal tracks, equal inner edges, and no
+   control wider than its column. This keeps every page consistent with the
+   maintenance form instead of fixing alignment one screen at a time. */
+.form-grid,
+.form-row {
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:stretch;
+}
+.form-grid > label,
+.form-row > label {
+  min-width:0;
+}
+.form-grid > label > input,
+.form-grid > label > select,
+.form-grid > label > textarea,
+.form-row > label > input,
+.form-row > label > select,
+.form-row > label > textarea {
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+}
+.form-grid > label > .field-hint,
+.form-row > label > .field-hint {
+  margin:0;
+}
+@media (max-width:800px) and (min-width:651px) {
+  .form-grid,
+  .form-row { gap:12px; }
+}
