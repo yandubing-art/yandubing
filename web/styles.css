@@ -2693,3 +2693,24 @@ html[data-theme="night"] .vehicle-kicker::before { color:#9ed6ff; }
   .maintenance-form .form-grid { gap:10px; }
   .maintenance-plan { padding:11px 12px 12px; }
 }
+
+/* Reserve the same hint row for every field so controls stay aligned when
+   only one field in a row has helper text. */
+.maintenance-form .form-grid { align-items:stretch; }
+.maintenance-form .form-grid > label {
+  grid-template-rows:auto 48px minmax(16px,auto);
+  align-content:start;
+}
+.maintenance-form .form-grid > label > input,
+.maintenance-form .form-grid > label > select {
+  width:100%;
+  height:48px;
+  min-height:48px;
+}
+.maintenance-form .form-grid > label > input[type="file"] {
+  display:flex;
+  align-items:center;
+}
+.maintenance-form .form-grid > label > .field-hint {
+  min-height:16px;
+}
