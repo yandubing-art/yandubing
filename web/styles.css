@@ -2670,3 +2670,26 @@ html[data-theme="night"] .vehicle-kicker::before { color:#9ed6ff; }
 @media (max-width:650px) {
   .top-actions .account-summary { min-width:0; padding:0; }
 }
+
+/* Keep the maintenance form compact so the vehicle summary remains the first view. */
+.vehicle-maintenance-panel { padding:16px; }
+.vehicle-maintenance-panel .section-heading { margin-bottom:12px; padding-bottom:10px; }
+.vehicle-maintenance-panel .section-heading h3 { font-size:17px; }
+.maintenance-form { gap:12px; }
+.maintenance-form .form-grid { gap:12px 14px; }
+.maintenance-form label { gap:6px; font-size:13px; }
+.maintenance-form input,
+.maintenance-form textarea { min-height:42px; border-radius:8px; }
+.maintenance-form textarea { min-height:72px; padding-top:10px; line-height:1.45; }
+.maintenance-form input[type="file"] { padding:6px; }
+.maintenance-form input[type="file"]::file-selector-button { padding:7px 9px; font-size:12px; }
+.maintenance-plan { padding:12px 14px 14px; }
+.maintenance-plan legend { font-size:11px; }
+.maintenance-form .field-hint { font-size:11px; }
+.maintenance-form > .button-primary { min-height:44px; font-size:14px; }
+.maintenance-history-heading { margin-top:20px; padding-top:14px; }
+@media (max-width:650px) {
+  .vehicle-maintenance-panel { padding:12px; }
+  .maintenance-form .form-grid { gap:10px; }
+  .maintenance-plan { padding:11px 12px 12px; }
+}

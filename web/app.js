@@ -544,6 +544,16 @@
     return null;
   }
 
+  function resetPageScroll() {
+    const reset = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+    reset();
+    window.requestAnimationFrame(reset);
+  }
+
   function showOverview() {
     if (isMobile) {
       history.pushState(null, "", "?view=apply");
@@ -2371,6 +2381,7 @@
   function openVehicleDetail(tableId, recordId, updateHistory = true) {
     const vehicle = vehicleByRecord(tableId, recordId);
     if (!vehicle) return setNotice("未找到车辆档案，请刷新后重试。", "error");
+    resetPageScroll();
     state.editingVehicle = vehicle;
     state.maintenanceRecords = [];
     maintenanceForm?.reset();
@@ -2388,6 +2399,7 @@
     ensureVehicleMaintenanceDateField();
     const vehicle = vehicleByRecord(tableId, recordId);
     if (!vehicle) return setNotice("未找到车辆档案，请刷新后重试。", "error");
+    resetPageScroll();
     state.creatingVehicle = false; state.editingVehicle = vehicle; state.vehiclePhotoDataUrl = ""; state.vehiclePhotoFullDataUrl = ""; state.vehiclePhotoThumbnailDataUrl = ""; state.logBookDocument = null; state.fleetCardPhotoDataUrl = ""; vehicleForm.reset(); showOnly("vehicleEditor");
     $("vehicleTableField").hidden = true;
     $("vehicleStatusInput").disabled = false;
