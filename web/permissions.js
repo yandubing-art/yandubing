@@ -1,5 +1,6 @@
 (() => {
   const $ = (id) => document.getElementById(id);
+  sessionStorage.setItem("dispatch_entry_mode_v1", "desktop");
   const state = { language: sessionStorage.getItem("dispatch_language") === "en" ? "en" : "zh", roles: {}, accounts: [], mode: "roles", selectedRole: "", selectedAccount: "" };
   const texts = {
     "车辆调度控制台": "Vehicle Dispatch Console", "权限管理": "Permission settings", "先设置角色默认权限，再为单个账号做独立覆盖": "Set role defaults first, then override access for individual accounts.", "账号管理": "Account management", "桌面调度台": "Desktop console", "退出登录": "Sign out", "角色默认权限": "Role defaults", "个人覆盖": "Individual overrides", "角色默认": "Role defaults", "修改角色后，使用该角色且没有个人覆盖的账号会采用新默认值。": "Accounts using this role without a personal override will use the new defaults.", "选择一个角色": "Select a role", "从左侧选择角色，编辑该角色的默认权限。": "Select a role on the left to edit its default permissions.", "恢复系统默认": "Restore system defaults", "恢复角色默认": "Restore role defaults", "保存角色权限": "Save role permissions", "保存个人权限": "Save individual permissions", "正在读取角色…": "Loading roles…", "正在读取账号…": "Loading accounts…", "请选择左侧角色。": "Select a role from the left.", "请选择左侧账号。": "Select an account from the left.", "角色权限已保存。": "Role permissions saved.", "个人权限已保存。": "Individual permissions saved.", "保存失败。": "Save failed.", "加载角色失败。": "Unable to load roles.", "项权限": "permissions", "继承角色默认": "Role defaults", "已单独覆盖": "Custom override", "正在保存权限…": "Saving permissions…", "已恢复系统默认，请点击保存角色权限。": "System defaults restored. Click save to apply.", "个人权限已恢复为角色默认。": "Individual permissions restored to the role defaults.", "修改后仅影响继承角色默认值的账号": "Only accounts inheriting this role default are affected.", "该账号已覆盖角色默认权限": "This account overrides the role defaults.", "该账号当前继承角色默认权限": "This account currently inherits the role defaults.", "移动调度": "Mobile dispatch", "任务访问": "Task access", "车辆与车况": "Vehicles and condition", "桌面与数据": "Desktop and data", "系统管理": "System administration",
@@ -67,6 +68,6 @@
     const account = currentAccount(); if (!account) return;
     try { const response = await fetch(`/api/auth/accounts/${encodeURIComponent(account.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resetPermissions: true }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || t("保存失败。")); const index = state.accounts.findIndex((item) => item.id === account.id); if (index >= 0) state.accounts[index] = payload.account; setNotice("个人权限已恢复为角色默认。", "success"); render(); } catch (error) { setNotice(error.message || t("保存失败。"), "error"); }
   });
-  $("logoutButton").addEventListener("click", async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.replace("/login"); });
+  $("logoutButton").addEventListener("click", async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.replace("/admin-login"); });
   translate(); load();
 })();

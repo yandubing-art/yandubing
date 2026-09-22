@@ -1,5 +1,6 @@
 (() => {
   const $ = (id) => document.getElementById(id);
+  sessionStorage.setItem("dispatch_entry_mode_v1", "desktop");
   const params = new URLSearchParams(window.location.search);
   const safeNext = (value) => value && value.startsWith("/") && !value.startsWith("//") ? value : "/?view=overview";
   const state = { language: sessionStorage.getItem("dispatch_language") === "en" ? "en" : "zh", next: safeNext(params.get("next")) };

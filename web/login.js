@@ -4,6 +4,7 @@
   const mobileDevice = navigator.userAgentData?.mobile === true || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(userAgent);
   const desktopDevice = /Windows NT|Macintosh|X11|Linux x86_64/i.test(userAgent);
   const defaultNext = !mobileDevice && (desktopDevice || window.matchMedia("(min-width: 701px)").matches) ? "/?view=overview" : "/?view=apply";
+  sessionStorage.setItem("dispatch_entry_mode_v1", defaultNext.includes("view=overview") ? "desktop" : "mobile");
   const safeNext = (value) => {
     if (value === "/" || value === "/index.html" || !value) return defaultNext;
     return value.startsWith("/") && !value.startsWith("//") ? value : defaultNext;

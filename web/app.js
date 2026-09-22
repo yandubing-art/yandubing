@@ -2,6 +2,7 @@
   const params = new URLSearchParams(window.location.search);
   const view = params.get("view") || "apply";
   const isMobile = ["apply", "departure", "transfer", "return", "booking"].includes(view);
+  const entryMode = sessionStorage.getItem("dispatch_entry_mode_v1");
   const isTransferView = view === "transfer";
   const isReturnOnly = view === "return";
   const phoneLanguages = Array.isArray(navigator.languages) && navigator.languages.length ? navigator.languages : [navigator.language || "en"];
@@ -691,7 +692,7 @@
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST", headers: headers() });
-    window.location.replace(isMobile ? "/login" : "/admin-login");
+    window.location.replace(entryMode === "desktop" || (!entryMode && !isMobile) ? "/admin-login" : "/login");
   }
 
   function visibleTasks() {
