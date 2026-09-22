@@ -68,5 +68,5 @@ const server = http.createServer(async (request, response) => {
 server.listen(8787, "127.0.0.1", () => {
   console.log("Open this URL to authorize Gmail:");
   console.log(authorizationUrl.toString());
-  if (process.platform === "win32") execFile("cmd", ["/c", "start", "", authorizationUrl.toString()]);
+  if (process.platform === "win32") execFile("explorer.exe", [authorizationUrl.toString()]);
 });
