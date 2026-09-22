@@ -314,7 +314,10 @@ function safeNext(value: unknown): string {
 }
 
 function isMobileRequest(req: Request): boolean {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(req.get("user-agent") || "");
+  const userAgent = req.get("user-agent") || "";
+  const clientPlatform = req.get("sec-ch-ua-platform") || "";
+  if (/Windows|macOS|Linux/i.test(clientPlatform)) return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(userAgent);
 }
 
 function defaultAuthenticatedTarget(req: Request): string {
@@ -523,6 +526,13 @@ app.get(["/", "/index.html"], (req, res) => {
   // This response varies by session and requested workflow. Never let a
   // desktop HTML shell be reused while a mobile account is loading.
   noStore(res);
+  const hasExplicitView = typeof req.query.view === "string" && Boolean(req.query.view);
+  if (!hasExplicitView) {
+    const loginPath = isMobileRequest(req) ? "/login" : "/admin-login";
+    const next = defaultAuthenticatedTarget(req);
+    res.redirect(`${loginPath}?next=${encodeURIComponent(next)}`);
+    return;
+  }
   const principal = sessionPrincipal(req);
   if (!principal) {
     const requestedView = typeof req.query.view === "string" ? req.query.view : defaultEntryView(req);
@@ -531,7 +541,8 @@ app.get(["/", "/index.html"], (req, res) => {
       return;
     }
     const loginPath = isMobileRequest(req) ? "/login" : "/admin-login";
-    res.redirect(`${loginPath}?next=${encodeURIComponent(req.originalUrl)}`);
+    const next = !isMobileRequest(req) && requestedView === "apply" ? "/?view=overview" : req.originalUrl;
+    res.redirect(`${loginPath}?next=${encodeURIComponent(next)}`);
     return;
   }
   const requestedView = typeof req.query.view === "string" ? req.query.view : defaultEntryView(req);
