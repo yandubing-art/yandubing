@@ -2614,3 +2614,44 @@ html[data-theme="night"] .tracker-history-location { color:#9ed6ff; }
   .tracker-history-summary-bar { align-items:stretch; flex-direction:column; }
   .tracker-history-route-summary { margin-left:15px; margin-right:15px; }
 }
+
+/* Make the department/store relationship a primary scanning cue on fleet cards. */
+.vehicle-kicker {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:36px;
+  margin:0 0 10px;
+  padding:7px 10px;
+  overflow:hidden;
+  border:1px solid rgba(47,125,244,.22);
+  border-left:4px solid #2f7df4;
+  border-radius:8px;
+  background:rgba(47,125,244,.08);
+  color:#244f9b;
+  font-size:12px;
+  font-weight:850;
+  letter-spacing:0;
+  text-transform:none;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.vehicle-kicker::before {
+  content:"所属门店 / 部门";
+  flex:0 0 auto;
+  color:#5873a3;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.02em;
+}
+html[lang="en"] .vehicle-kicker::before { content:"Department / store"; }
+html[data-theme="night"] .vehicle-kicker {
+  border-color:rgba(104,213,255,.25);
+  border-left-color:#68d5ff;
+  background:rgba(79,195,255,.1);
+  color:#e2f2ff;
+}
+html[data-theme="night"] .vehicle-kicker::before { color:#9ed6ff; }
+@media (max-width:650px) {
+  .vehicle-kicker { min-height:34px; margin-bottom:9px; padding:6px 9px; }
+}
