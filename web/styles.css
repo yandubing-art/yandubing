@@ -187,6 +187,13 @@ html.low-performance .app-loading-spinner { animation:none; border-top-color:var
 .maintenance-document-empty { color:var(--muted); }
 .vehicle-tracker-panel { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-top:22px; padding:16px; border:1px solid rgba(79,195,255,.22); border-radius:14px; background:rgba(79,195,255,.06); }
 .vehicle-tracker-panel p:last-child { margin:0; color:var(--muted); font-size:11px; line-height:1.5; }
+.vehicle-tracker-editor-status { display:grid; gap:8px; margin-top:9px; padding:10px; border:1px solid rgba(79,195,255,.22); border-radius:8px; background:rgba(79,195,255,.06); }
+.vehicle-tracker-editor-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.vehicle-tracker-editor-heading strong { color:var(--ink); font-size:12px; }
+.vehicle-tracker-editor-status small { color:var(--muted); font-size:10px; line-height:1.4; }
+.vehicle-tracker-editor-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+.vehicle-tracker-editor-grid span { display:grid; gap:3px; min-width:0; }
+.vehicle-tracker-editor-grid strong { color:var(--ink); font-size:11px; line-height:1.4; overflow-wrap:anywhere; }
 @media (max-width:650px){.vehicle-maintenance-panel{margin:0 16px 16px;padding:16px}.maintenance-record-top,.maintenance-record-footer{align-items:flex-start;flex-direction:column}.vehicle-tracker-panel{align-items:flex-start;flex-direction:column}.vehicle-tracker-panel .button{width:100%;text-align:center}}
 @media (max-width:650px){.vehicle-detail-content{padding:16px}.vehicle-detail-hero{grid-template-columns:1fr;gap:16px}.vehicle-detail-photo,.vehicle-detail-photo img{min-height:190px}.vehicle-detail-summary h3{font-size:24px}.vehicle-detail-grid{grid-template-columns:1fr;margin-top:16px}.vehicle-detail-items{grid-template-columns:1fr 1fr}.vehicle-detail-actions{padding:0 16px 16px;display:grid}.vehicle-detail-actions .button{width:100%}}
 

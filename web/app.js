@@ -1108,6 +1108,29 @@
     return t("Tracker 中暂未找到这辆车。");
   }
 
+  function renderVehicleTrackerLiveStatus(vehicle = state.editingVehicle) {
+    const select = $("vehicleTrackerInput");
+    if (!select) return;
+    let panel = $("vehicleTrackerLiveStatus");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = "vehicleTrackerLiveStatus";
+      panel.className = "vehicle-tracker-editor-status";
+      panel.setAttribute("role", "status");
+      panel.setAttribute("aria-live", "polite");
+      select.parentElement?.append(panel);
+    }
+    const match = vehicle ? trackerMatchForVehicle(vehicle) : null;
+    const snapshot = match?.status === "matched" ? match.snapshot : null;
+    if (!snapshot) {
+      panel.innerHTML = state.trackerStatus?.lastSuccessAt
+        ? `<span class="tracker-status tracker-missing">${escapeHtml(t("Tracker 未匹配"))}</span><small>${escapeHtml(trackerMatchMessage(match))}</small>`
+        : `<small>${escapeHtml(t("Tracker 数据尚未加载"))}</small>`;
+      return;
+    }
+    panel.innerHTML = `<div class="vehicle-tracker-editor-heading"><strong>${escapeHtml(snapshot.registration)}</strong>${trackerBadge(match)}</div><div class="vehicle-tracker-editor-grid"><span><small>${escapeHtml(t("车辆实际状态"))}</small><strong>${escapeHtml(snapshot.status || t("未填写"))}</strong></span><span><small>${escapeHtml(t("Tracker 位置"))}</small><strong>${escapeHtml(snapshot.location || t("未填写"))}</strong></span><span><small>${escapeHtml(t("数据时间"))}</small><strong>${escapeHtml(trackerTime(snapshot.trackerTimestamp))}</strong></span><span><small>${escapeHtml(t("最后同步"))}</small><strong>${escapeHtml(trackerTime(state.trackerStatus?.lastSuccessAt))}</strong></span></div>`;
+  }
+
   function renderTrackerDialog() {
     const vehicle = state.vehicles.find((item) => trackerVehicleKey(item) === state.trackerVehicleKey);
     if (!vehicle || !trackerDialogBody) return;
@@ -1450,7 +1473,9 @@
     const hint = $("vehicleTrackerHint");
     if (!select) return;
     const vehicle = state.editingVehicle;
-    const current = cleanDisplay(select.value || vehicle?.trackerRegistration || "");
+    const automaticMatch = vehicle ? trackerMatchForVehicle(vehicle) : null;
+    const automaticRegistration = automaticMatch?.status === "matched" ? cleanDisplay(automaticMatch.snapshot?.registration) : "";
+    const current = cleanDisplay(select.value || vehicle?.trackerRegistration || automaticRegistration);
     const trackers = Array.isArray(state.trackerStatus?.trackers) ? state.trackerStatus.trackers : [];
     const seen = new Set();
     const options = trackers.flatMap((tracker) => {
@@ -1471,9 +1496,12 @@
       hint.textContent = !canPersist
         ? t("车辆档案表未配置 Tracker 匹配字段；请先增加 Tracker 文本字段。")
         : options.length
-          ? t("选择已同步的 Tracker 车辆；保存后优先使用这个匹配。")
+          ? automaticRegistration && !vehicle?.trackerRegistration
+            ? t("已按车牌/VIN自动关联 Tracker；保存后会写回这个编号。")
+            : t("选择已同步的 Tracker 车辆；保存后优先使用这个匹配。")
           : t("Tracker 数据尚未加载");
     }
+    renderVehicleTrackerLiveStatus(vehicle);
   }
 
   function renderVehicleEditorOptions() {
