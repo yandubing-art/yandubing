@@ -2630,7 +2630,8 @@ html[data-theme="night"] .tracker-history-location { color:#9ed6ff; }
   background:rgba(47,125,244,.08);
   color:#244f9b;
   font-size:12px;
-  font-weight:850;
+  font-weight:900;
+  -webkit-text-stroke:.12px currentColor;
   letter-spacing:0;
   text-transform:none;
   text-overflow:ellipsis;
@@ -2641,7 +2642,8 @@ html[data-theme="night"] .tracker-history-location { color:#9ed6ff; }
   flex:0 0 auto;
   color:#5873a3;
   font-size:10px;
-  font-weight:900;
+  font-weight:950;
+  -webkit-text-stroke:.08px currentColor;
   letter-spacing:.02em;
 }
 html[lang="en"] .vehicle-kicker::before { content:"Department / store"; }
