@@ -16,7 +16,7 @@ import { LarkPhotoSyncStore, oauthTokenData, tokenLifetimeMs } from "./lark-phot
 import { TrackerHistoryStore } from "./tracker-history-store.js";
 import { TrackerMileageSyncStore } from "./tracker-mileage-sync.js";
 import { matchTrackerVehicle, normalizeTrackerIdentifier, trackerVehicleKey, TrackerStatusStore } from "./tracker-status-store.js";
-import type { VehicleProfile } from "./types.js";
+import type { VehicleProfile, VehicleSyncResult } from "./types.js";
 
 assertLarkConfiguration();
 const photoSync = new LarkPhotoSyncStore();
@@ -79,6 +79,15 @@ function vehiclesWithMileageSource(vehicles: VehicleProfile[]): VehicleProfile[]
       mileageSourceReportEnd: state.reportEnd || undefined
     };
   });
+}
+
+function clearTrackerMileageSourceAfterTripSync(result: VehicleSyncResult, submittedMileage: number | null): void {
+  if (!result.matched || !result.vehicle) return;
+  const confirmedCurrentValue = result.status === "updated"
+    || (result.status === "unchanged" && result.vehicle.mileage === submittedMileage);
+  if (confirmedCurrentValue) {
+    trackerMileageSync.markMileageSupersededByTrip(result.vehicle.tableId, result.vehicle.recordId);
+  }
 }
 
 function compactDispatchVehicles(vehicles: VehicleProfile[]): Array<Pick<VehicleProfile, "tableId" | "tableName" | "recordId" | "plate" | "brand" | "model" | "modelDescription" | "vehicleType" | "status" | "owner" | "dispatchEligible" | "mileage" | "nextMaintenanceMileage">> {
@@ -1472,7 +1481,10 @@ app.post("/api/tasks", requireAnyPermission("mobile_dispatch", "desktop_console"
     // The task record is the critical acknowledgement. Vehicle mileage sync
     // is independent and can continue after the mobile request is answered.
     void lark.syncVehicleMileage(textValue(preparedFields[config.fields.vehicle]), numberValue(preparedFields[config.fields.mileage]), match)
-      .then((result) => console.info("Background vehicle mileage sync finished", { recordId: record.record_id, result }))
+      .then((result) => {
+        clearTrackerMileageSourceAfterTripSync(result, numberValue(preparedFields[config.fields.mileage]));
+        console.info("Background vehicle mileage sync finished", { recordId: record.record_id, result });
+      })
       .catch((error) => console.warn("Background vehicle mileage sync failed", { recordId: record.record_id, error: error instanceof Error ? error.message : String(error) }));
     res.status(201).json({ ok: true, recordId: record.record_id, vehicleMatch, vehicleSync: { status: "pending", message: "车辆里程正在后台同步" } });
   } catch (error) {
@@ -1512,7 +1524,10 @@ app.patch("/api/tasks/:recordId", requireAnyPermission("mobile_dispatch", "deskt
     const record = await lark.updateRecord(recordId, preparedFields);
     const match = vehicleMatch && typeof vehicleMatch === "object" && "status" in vehicleMatch && vehicleMatch.status !== "unavailable" ? vehicleMatch as Parameters<typeof lark.syncVehicleMileage>[2] : undefined;
     void lark.syncVehicleMileage(textValue(preparedFields[config.fields.vehicle]), numberValue(preparedFields[config.fields.mileage]), match)
-      .then((result) => console.info("Background vehicle mileage sync finished", { recordId, result }))
+      .then((result) => {
+        clearTrackerMileageSourceAfterTripSync(result, numberValue(preparedFields[config.fields.mileage]));
+        console.info("Background vehicle mileage sync finished", { recordId, result });
+      })
       .catch((error) => console.warn("Background vehicle mileage sync failed", { recordId, error: error instanceof Error ? error.message : String(error) }));
     res.json({ ok: true, recordId: record?.record_id || recordId, vehicleMatch, vehicleSync: { status: "pending", message: "车辆里程正在后台同步" } });
   } catch (error) {
@@ -1644,6 +1659,7 @@ app.post("/api/tasks/:recordId/return", requireAnyPermission("mobile_dispatch", 
       checkResult: typeof req.body?.checkResult === "string" ? req.body.checkResult : "",
       notes: typeof req.body?.photoNotes === "string" ? req.body.photoNotes : ""
     }, photoPayload(req.body?.photos || []));
+    clearTrackerMileageSourceAfterTripSync(result.vehicleSync, returnMileage);
     const updatedRecord = await lark.getRecord(recordId);
     const vehicle = await lark.findVehicle(textValue(updatedRecord.fields[config.fields.vehicle]));
     const notification = await sendNotification("return", updatedRecord, vehicle.vehicle?.owner || "");

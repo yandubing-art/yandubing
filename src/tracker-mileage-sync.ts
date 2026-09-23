@@ -10,6 +10,7 @@ import type { VehicleProfile, VehicleSyncResult } from "./types.js";
 export type TrackerMileageAuditStatus =
   | "updated"
   | "unchanged"
+  | "superseded_by_trip"
   | "lower_than_current"
   | "not_found"
   | "ambiguous"
@@ -86,6 +87,17 @@ export class TrackerMileageSyncStore {
       completedAt: new Date().toISOString(),
       results
     });
+  }
+
+  markMileageSupersededByTrip(tableId: string, recordId: string): void {
+    const state = this.read();
+    let changed = false;
+    const results = state.results.map((result) => {
+      if (result.tableId !== tableId || result.recordId !== recordId || result.status !== "updated") return result;
+      changed = true;
+      return { ...result, status: "superseded_by_trip" as const, message: "车辆公里数已由移动调度行程确认或更新" };
+    });
+    if (changed) this.persist({ ...state, results });
   }
 
   private load(): TrackerMileageSyncState {
