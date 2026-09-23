@@ -242,6 +242,7 @@ select option { background:#111625; color:var(--ink); }
 .vehicle-specs strong,.vehicle-maintenance-row strong { color:#e8edf8; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .mileage-cell { position:relative; }
 .mileage-value-line { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px; min-width:0; }
+.vehicle-specs .mileage-value-line { flex-direction:row; justify-content:flex-start; padding:0; border:0; background:transparent; }
 .mileage-source { display:inline; font-size:9px; font-weight:800; line-height:1.25; letter-spacing:.01em; white-space:nowrap; }
 .tracker-mileage-source { color:#b47b00; }
 .tracker-mileage-value { color:#b47b00 !important; }
