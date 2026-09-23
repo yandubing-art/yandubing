@@ -41,7 +41,7 @@ export type TrackerMileageSyncState = {
 };
 
 export type TrackerMileageSyncSummary = {
-  status: "updated" | "unchanged" | "skipped";
+  status: "updated" | "unchanged" | "partial" | "skipped";
   message: string;
   sourceHash?: string;
   reportStart?: string;
@@ -57,6 +57,10 @@ const EMPTY_STATE: TrackerMileageSyncState = {
   completedAt: null,
   results: []
 };
+
+export function hasRetryableTrackerMileageResults(state: TrackerMileageSyncState): boolean {
+  return state.results.some((result) => result.status === "error");
+}
 
 export class TrackerMileageSyncStore {
   private readonly filePath: string;
@@ -167,13 +171,22 @@ export async function syncTrackerMileageReport(
     return { status: "skipped", message: "Tracker 报表公里数自动更新未启用", results: [] };
   }
   const previous = store.read();
-  if (!options.dryRun && previous.sourceHash === report.sourceHash && previous.completedAt) {
+  const sameReport = previous.sourceHash === report.sourceHash && Boolean(previous.completedAt);
+  if (!options.dryRun && sameReport && !hasRetryableTrackerMileageResults(previous)) {
     return { status: "unchanged", message: "该 Tracker 报表公里数已经处理过", sourceHash: report.sourceHash, reportStart: report.reportStart, reportEnd: report.reportEnd, results: previous.results };
   }
 
   const vehicles = await lark.listVehicles();
   const results: TrackerMileageAuditRecord[] = [];
+  const previousResults = sameReport && !options.dryRun
+    ? new Map(previous.results.map((result) => [result.normalizedRegistration, result]))
+    : new Map<string, TrackerMileageAuditRecord>();
   for (const record of report.records) {
+    const previousResult = previousResults.get(record.normalizedRegistration);
+    if (previousResult && previousResult.status !== "error") {
+      results.push(previousResult);
+      continue;
+    }
     const audit = baseAudit(record);
     if (!record.odometerEndConsistent) {
       results.push({ ...audit, status: "inconsistent_report", message: "同一车辆在报表中的结束公里数不一致，未写回" });
@@ -214,7 +227,8 @@ export async function syncTrackerMileageReport(
     return summary;
   }, {});
   return {
-    status: results.some((item) => item.status === "updated") ? "updated" : "unchanged",
+    status: results.some((item) => item.status === "error") ? "partial"
+      : results.some((item) => item.status === "updated") ? "updated" : "unchanged",
     message: `${options.dryRun ? "Tracker 报表公里数匹配预览" : "Tracker 报表公里数同步完成"}：${JSON.stringify(counts)}`,
     sourceHash: report.sourceHash,
     reportStart: report.reportStart,

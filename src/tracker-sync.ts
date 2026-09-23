@@ -7,7 +7,7 @@ import { readTrackerVehicleList } from "./tracker-live.js";
 import { TrackerHistoryStore } from "./tracker-history-store.js";
 import { deduplicateTrackerRecords, TrackerStatusStore } from "./tracker-status-store.js";
 import { cleanupTrackerEmailReports, syncLatestTrackerEmailReport, TrackerEmailReportStore } from "./tracker-email-report.js";
-import { syncStoredTrackerEmailMileage, TrackerMileageSyncStore } from "./tracker-mileage-sync.js";
+import { hasRetryableTrackerMileageResults, syncStoredTrackerEmailMileage, TrackerMileageSyncStore } from "./tracker-mileage-sync.js";
 import { LarkClient } from "./lark.js";
 
 const statusStore = new TrackerStatusStore();
@@ -38,7 +38,12 @@ function emailReportDue(now = new Date()): boolean {
   if (minutes < start || minutes > end) return false;
   const runDate = localDateKey(now);
   const state = emailReportStore.read();
-  if (state.lastSuccessRunDate === runDate) return false;
+  if (state.lastSuccessRunDate === runDate) {
+    const mileageState = mileageSyncStore.read();
+    const mileageNeedsRetry = config.trackerMileageSyncEnabled && Boolean(state.sourceHash)
+      && (mileageState.sourceHash !== state.sourceHash || !mileageState.completedAt || hasRetryableTrackerMileageResults(mileageState));
+    if (!mileageNeedsRetry) return false;
+  }
   const lastAttempt = Date.parse(state.lastAttemptAt || "");
   return !Number.isFinite(lastAttempt) || Date.now() - lastAttempt >= 30 * 60 * 1000;
 }
