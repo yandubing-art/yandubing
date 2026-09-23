@@ -1118,6 +1118,29 @@ export class LarkClient {
     return { status: "updated", matched: true, updated: true, vehicle: updatedVehicle, message: `已将 ${vehicle.plate} 车辆档案公里数更新为 ${mileage}` };
   }
 
+  /**
+   * Update a mileage from a historical Tracker report. Reload the vehicle
+   * record immediately before writing so a concurrent departure/return
+   * submission cannot be overwritten by a stale report value.
+   */
+  async syncTrackerReportMileage(vehicle: VehicleProfile, mileage: number): Promise<VehicleSyncResult> {
+    this.invalidateVehiclesCache();
+    const current = (await this.loadVehicles()).find((item) => item.tableId === vehicle.tableId && item.recordId === vehicle.recordId);
+    if (!current) return { status: "not_found", matched: false, updated: false, message: "车辆档案在写回前已不存在" };
+    if (!current.currentMileageField) {
+      return { status: "skipped", matched: true, updated: false, vehicle: current, message: `${current.tableName} 尚未建立当前公里数字段，未回写车辆档案` };
+    }
+    if (current.mileage !== null && mileage < current.mileage) {
+      return { status: "lower_than_current", matched: true, updated: false, vehicle: current, message: `Tracker 报表公里数 ${mileage} 小于车辆档案当前公里数 ${current.mileage}，未回退档案` };
+    }
+    if (current.mileage === mileage) {
+      return { status: "unchanged", matched: true, updated: false, vehicle: current, message: "车辆档案公里数已经是最新值" };
+    }
+    await this.updateRecord(current.recordId, { [current.currentMileageField]: String(mileage) }, current.tableId);
+    this.invalidateVehiclesCache();
+    return { status: "updated", matched: true, updated: true, vehicle: { ...current, mileage }, message: `已将 ${current.plate} 车辆档案公里数更新为 ${mileage}` };
+  }
+
   async syncBackendVehiclePhoto(vehicle: VehicleProfile, upload: { fileName: string; dataUrl: string }): Promise<string> {
     if (!vehicle.photoFieldConfigured) throw new Error(`${vehicle.tableName} 尚未配置车辆照片字段`);
     const fields: Record<string, unknown> = {};

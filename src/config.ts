@@ -114,6 +114,8 @@ function buildConfig() {
   trackerReportEmailRunHour: clockHour("TRACKER_REPORT_EMAIL_RUN_HOUR", 2),
   trackerReportEmailRunMinute: clockMinute("TRACKER_REPORT_EMAIL_RUN_MINUTE", 0),
   trackerReportEmailLookbackDays: integer("TRACKER_REPORT_EMAIL_LOOKBACK_DAYS", 7),
+  trackerMileageSyncEnabled: boolean("TRACKER_MILEAGE_SYNC_ENABLED", false),
+  trackerMileageSyncStatePath: runtimeEnvironment.TRACKER_MILEAGE_SYNC_STATE_PATH?.trim() || "./data/tracker-mileage-sync.json",
   trackerSyncIntervalMs: integer("TRACKER_SYNC_INTERVAL_SECONDS", 300) * 1000,
   trackerActiveSyncIntervalMs: integer("TRACKER_ACTIVE_SYNC_INTERVAL_SECONDS", 300) * 1000,
   trackerMinimumSyncIntervalMs: integer("TRACKER_MIN_SYNC_INTERVAL_SECONDS", 300) * 1000,

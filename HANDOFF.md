@@ -29,6 +29,8 @@
 - 车辆资料编辑页优先按车牌/VIN自动关联 Tracker 实时记录；匹配到时展示 Tracker 编号、状态、位置和数据/同步时间，并可将编号保存到车辆档案 Tracker 字段。同步间隔由 `TRACKER_SYNC_INTERVAL_SECONDS` 控制，前端状态轮询为 60 秒。
 - Tracker 字段识别同时读取车辆表字段定义，空值记录也能识别为已配置，避免因飞书省略空字段而误报未配置。
 - Tracker `Trip Report (Detail)` 每日报表支持通过 Gmail OAuth2 + IMAP 自动读取 CSV 附件：默认服务器时间每天 02:00 首次检查，未发现新文件时每 30 分钟重试至 06:00；按邮件 ID 和文件哈希去重，解析结果保存到 `data/tracker-email-report.json`，原始 CSV 保存到 `data/tracker-email-reports`，邮箱读取为只读且不删除邮件。服务器只保存 OAuth 客户端密钥和刷新令牌，不保存 Gmail 登录密码；Google OAuth 授权范围必须包含 `https://mail.google.com/`。
+- Tracker 每日报表公里数自动更新已接入：报表成功读取后按车辆档案 Tracker 编号、VIN、车牌依次唯一匹配，仅当 `VehOdometerEnd` 高于当前档案公里数时写回；较低公里数、报表冲突、缺少字段和无法唯一匹配的记录不会写回。同步前会重新读取车辆档案并再次比较，避免覆盖并发提交的出发/返程公里数；出发/返程任务字段与报表同步互不改写。审计保存在 `data/tracker-mileage-sync.json`，按 CSV 哈希去重。
+- 车辆总览卡片和车辆档案详情会标注“Tracker报表更新”的公里数来源；行程列表中的出发/返程公里数保持正常颜色。若之后行程写入更高公里数，来源标记会自动消失。
 - 车辆管理页面进入车辆详情或编辑页时自动回到顶部；保养提交区域使用紧凑尺寸。
 - 全页面表单布局基准：两列表单固定为 `1fr / 1fr`，左右列使用相同内边距和间距；输入框、选择框、文件框和文本框占满所在列并限制最小宽度；单控件字段统一为 48px 高度；带辅助文字和不带辅助文字的字段预留相同提示行，保证左右输入框在同一水平线上；含多个联动控件的字段（驾驶人、车辆、地点快速选择）保持自身联动布局；屏幕宽度 650px 以下改为单列，651px 至 800px 使用统一 12px 列间距。后续新增表单应复用 `.form-grid` / `.form-row`，不要单独设置不对称左右尺寸。
 
@@ -53,6 +55,7 @@
 - 修改角色权限后，新权限会影响后续登录与接口鉴权；已有会话遇到权限变化时建议重新登录。
 - Tracker 数据依赖后台同步进程持续运行；发现状态停留时先检查 `lark-tracker-sync` 日志和 Tracker 凭据。
 - 每日报表邮箱同步依赖 Gmail OAuth2 客户端配置和刷新令牌；先检查 `lark-tracker-sync` 日志中的 `Tracker email report check`，再检查服务器 `data/tracker-email-report.json` 的 `lastError`、`reportEnd` 和 `records`。OAuth 授权失败时不要改回普通 Gmail 密码，重新检查 Google Cloud OAuth 同意屏幕、`https://mail.google.com/` scope 和刷新令牌。
+- 每日报表公里数同步还需检查 `lark-tracker-sync` 日志中的 `Tracker email mileage sync`，以及 `data/tracker-mileage-sync.json` 的 `sourceHash`、`completedAt` 和逐车 `status`。一次性预览使用 `node dist/tracker-sync.js --email-mileage-dry-run`，实际处理已下载报表使用 `node dist/tracker-sync.js --email-mileage-once`。
 - 前端发布后如仍显示旧按钮，使用浏览器强制刷新或退出后重新进入。
 
 ## 后续建议

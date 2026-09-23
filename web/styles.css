@@ -240,6 +240,11 @@ select option { background:#111625; color:var(--ink); }
 .vehicle-specs span,.vehicle-maintenance-row { display:flex; flex-direction:column; gap:4px; min-width:0; padding:9px 10px; border:1px solid rgba(211,224,255,.1); border-radius:11px; background:rgba(255,255,255,.035); }
 .vehicle-specs small,.vehicle-maintenance-row span { color:#8290a8; font-size:10px; }
 .vehicle-specs strong,.vehicle-maintenance-row strong { color:#e8edf8; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mileage-cell { position:relative; }
+.mileage-source { display:block; font-size:9px; font-weight:800; line-height:1.25; letter-spacing:.01em; }
+.tracker-mileage-source { color:#b47b00; }
+.tracker-mileage-value { color:#b47b00 !important; }
+html[data-theme="night"] .tracker-mileage-source,html[data-theme="night"] .tracker-mileage-value { color:#f4d35e !important; }
 .vehicle-maintenance-row { flex-direction:row; justify-content:space-between; align-items:center; margin-top:8px; }
 .vehicle-maintenance-row strong { color:#aee3ff; }
 .vehicle-completeness { max-height:34px; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }

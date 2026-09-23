@@ -7,10 +7,14 @@ import { readTrackerVehicleList } from "./tracker-live.js";
 import { TrackerHistoryStore } from "./tracker-history-store.js";
 import { deduplicateTrackerRecords, TrackerStatusStore } from "./tracker-status-store.js";
 import { cleanupTrackerEmailReports, syncLatestTrackerEmailReport, TrackerEmailReportStore } from "./tracker-email-report.js";
+import { syncStoredTrackerEmailMileage, TrackerMileageSyncStore } from "./tracker-mileage-sync.js";
+import { LarkClient } from "./lark.js";
 
 const statusStore = new TrackerStatusStore();
 const historyStore = new TrackerHistoryStore();
 const emailReportStore = new TrackerEmailReportStore();
+const mileageSyncStore = new TrackerMileageSyncStore();
+const lark = new LarkClient();
 let stopping = false;
 let activeContext: BrowserContext | null = null;
 let emailSyncRunning = false;
@@ -47,6 +51,8 @@ async function syncEmailReportIfDue(): Promise<void> {
     cleanupTrackerEmailReports();
     const result = await syncLatestTrackerEmailReport(runDate, emailReportStore);
     console.log("Tracker email report check", { runDate, ...result });
+    const mileageResult = await syncStoredTrackerEmailMileage(lark, emailReportStore, mileageSyncStore);
+    console.log("Tracker email mileage sync", mileageResult);
   } catch (error) {
     console.warn("Tracker email report check failed", { runDate, error: message(error) });
   } finally {
@@ -364,6 +370,15 @@ async function waitForNextRun(delayMs: number): Promise<string | undefined> {
 }
 
 async function main(): Promise<void> {
+  if (process.argv.includes("--email-mileage-once") || process.argv.includes("--email-mileage-dry-run")) {
+    if (process.argv.includes("--email-mileage-once")) {
+      const emailResult = await syncLatestTrackerEmailReport(localDateKey(), emailReportStore);
+      console.log("Tracker email report check", emailResult);
+    }
+    const result = await syncStoredTrackerEmailMileage(lark, emailReportStore, mileageSyncStore, { dryRun: process.argv.includes("--email-mileage-dry-run") });
+    console.log("Tracker email mileage sync", result);
+    return;
+  }
   if (process.argv.includes("--email-once")) {
     const result = await syncLatestTrackerEmailReport(localDateKey(), emailReportStore);
     console.log("Tracker email report check", result);

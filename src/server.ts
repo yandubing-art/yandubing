@@ -14,6 +14,7 @@ import { NotificationSettingsStore, type NotificationStage, type VehicleReminder
 import { VehicleAssetsStore } from "./vehicle-assets-store.js";
 import { LarkPhotoSyncStore, oauthTokenData, tokenLifetimeMs } from "./lark-photo-sync-store.js";
 import { TrackerHistoryStore } from "./tracker-history-store.js";
+import { TrackerMileageSyncStore } from "./tracker-mileage-sync.js";
 import { matchTrackerVehicle, normalizeTrackerIdentifier, trackerVehicleKey, TrackerStatusStore } from "./tracker-status-store.js";
 import type { VehicleProfile } from "./types.js";
 
@@ -27,6 +28,7 @@ const notificationSettings = new NotificationSettingsStore();
 const vehicleAssets = new VehicleAssetsStore();
 const trackerStatus = new TrackerStatusStore();
 const trackerHistory = new TrackerHistoryStore();
+const trackerMileageSync = new TrackerMileageSyncStore();
 const app = express();
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../web");
 
@@ -63,6 +65,20 @@ function vehicleWithLocalAssets<T extends { tableId: string; recordId: string; p
 
 function vehiclesWithLocalAssets<T extends { tableId: string; recordId: string; photoUrl: string; fleetCardPhotoUrl: string; photoFileToken?: string; fleetCardPhotoFileToken?: string }>(vehicles: T[]): T[] {
   return vehicles.map(vehicleWithLocalAssets);
+}
+
+function vehiclesWithMileageSource(vehicles: VehicleProfile[]): VehicleProfile[] {
+  const state = trackerMileageSync.read();
+  return vehicles.map((vehicle) => {
+    const audit = state.results.find((item) => item.tableId === vehicle.tableId && item.recordId === vehicle.recordId && item.status === "updated");
+    if (!audit || audit.reportMileage === null || vehicle.mileage !== audit.reportMileage) return vehicle;
+    return {
+      ...vehicle,
+      mileageSource: "tracker_report",
+      mileageSourceUpdatedAt: state.completedAt || undefined,
+      mileageSourceReportEnd: state.reportEnd || undefined
+    };
+  });
 }
 
 function compactDispatchVehicles(vehicles: VehicleProfile[]): Array<Pick<VehicleProfile, "tableId" | "tableName" | "recordId" | "plate" | "brand" | "model" | "modelDescription" | "vehicleType" | "status" | "owner" | "dispatchEligible" | "mileage" | "nextMaintenanceMileage">> {
@@ -1015,7 +1031,7 @@ app.get("/api/vehicles", requireAnyPermission("mobile_dispatch", "desktop_consol
   try {
     const principal = res.locals.principal as RequestPrincipal;
     const photoSyncResult = await syncBackendVehiclePhotos(await lark.listVehicles());
-    res.json({ ok: true, vehicles: vehiclesWithLocalAssets(visibleVehicles(principal, photoSyncResult.vehicles)), vehiclePhotosChecked: photoSyncResult.checked, vehiclePhotosSynced: photoSyncResult.synced, vehiclePhotoSyncFailed: photoSyncResult.failed });
+    res.json({ ok: true, vehicles: vehiclesWithLocalAssets(vehiclesWithMileageSource(visibleVehicles(principal, photoSyncResult.vehicles))), vehiclePhotosChecked: photoSyncResult.checked, vehiclePhotosSynced: photoSyncResult.synced, vehiclePhotoSyncFailed: photoSyncResult.failed });
   } catch (error) {
     next(error);
   }

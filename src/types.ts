@@ -111,6 +111,9 @@ export type VehicleProfile = {
   dispatchEligible: boolean;
   photoUrl: string;
   mileage: number | null;
+  mileageSource?: "tracker_report";
+  mileageSourceUpdatedAt?: string;
+  mileageSourceReportEnd?: string;
   nextMaintenanceMileage: number | null;
   nextMaintenanceDate: string;
   dateFieldNames: string[];
@@ -134,7 +137,7 @@ export type VehicleMatchResult = {
 };
 
 export type VehicleSyncResult = {
-  status: "updated" | "unchanged" | "not_found" | "ambiguous" | "skipped";
+  status: "updated" | "unchanged" | "lower_than_current" | "not_found" | "ambiguous" | "skipped";
   message: string;
   matched: boolean;
   updated: boolean;
