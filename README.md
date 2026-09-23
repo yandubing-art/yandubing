@@ -240,7 +240,7 @@ npm run gmail:oauth
 
 解析使用 `Reg`、`ReportStart`、`ReportEnd`、`VehOdometerStart` 和 `VehOdometerEnd`；同一车辆的结束公里数出现冲突时保留报表但标记为不一致，不进入自动补写。OAuth 客户端密钥和刷新令牌只保存在服务器环境变量，不提交到 Git。
 
-启用 `TRACKER_MILEAGE_SYNC_ENABLED=true` 后，报表解析结果会按“车辆档案 Tracker 编号 → VIN → 车牌”匹配车辆，只写入高于当前档案值的 `VehOdometerEnd`；报表值较低、同一车辆报表值冲突、字段缺失或无法唯一匹配时只保存审计结果，不写回。同步审计保存在 `data/tracker-mileage-sync.json`，并按报表文件哈希去重。今天已下载的报表可用 `node dist/tracker-sync.js --email-mileage-dry-run` 预览，确认后用 `node dist/tracker-sync.js --email-mileage-once` 执行。
+启用 `TRACKER_MILEAGE_SYNC_ENABLED=true` 后，报表解析结果会按“车辆档案 Tracker 编号 → VIN → 车牌”匹配车辆，只写入高于当前档案值的 `VehOdometerEnd`；报表值较低、同一车辆报表值冲突、字段缺失或无法唯一匹配时只保存审计结果，不写回。同步审计保存在 `data/tracker-mileage-sync.json`，并按报表文件哈希去重；同一报表如有 `error` 记录，仅重试失败车辆并保留此前成功记录的审计。当天已下载报表尚未完成或存在写回错误时，会在 02:00–06:00 窗口按 30 分钟冷却重试。今天已下载的报表可用 `node dist/tracker-sync.js --email-mileage-dry-run` 预览，确认后用 `node dist/tracker-sync.js --email-mileage-once` 执行。
 
 自动报表更新与出发/返程行程写回相互独立；行程提交继续写正常的出发公里数和返程公里数，报表同步在写入前重新读取车辆档案并再次比较，不能覆盖更高的行程公里数。车辆总览和车辆档案详情会以小字和颜色标出当前值来自 Tracker 报表；如果之后被行程公里数更新为更高值，该标记自动消失。
 
