@@ -93,7 +93,7 @@ export class TrackerMileageSyncStore {
     const state = this.read();
     let changed = false;
     const results = state.results.map((result) => {
-      if (result.tableId !== tableId || result.recordId !== recordId || result.status !== "updated") return result;
+      if (result.tableId !== tableId || result.recordId !== recordId || (result.status !== "updated" && result.status !== "unchanged")) return result;
       changed = true;
       return { ...result, status: "superseded_by_trip" as const, message: "车辆公里数已由移动调度行程确认或更新" };
     });
@@ -190,7 +190,7 @@ export async function syncTrackerMileageReport(
 
   const vehicles = await lark.listVehicles();
   const results: TrackerMileageAuditRecord[] = [];
-  const previousResults = sameReport && !options.dryRun
+  const previousResults = !options.dryRun
     ? new Map(previous.results.map((result) => [result.normalizedRegistration, result]))
     : new Map<string, TrackerMileageAuditRecord>();
   for (const record of report.records) {
@@ -215,6 +215,10 @@ export async function syncTrackerMileageReport(
     }
     if (!match.vehicle.currentMileageField) {
       results.push({ ...audit, status: "missing_mileage_field", matchBy: match.matchBy, tableId: match.vehicle.tableId, recordId: match.vehicle.recordId, plate: match.vehicle.plate, currentMileage: match.vehicle.mileage, message: `${match.vehicle.tableName} 尚未建立当前公里数字段，未写回` });
+      continue;
+    }
+    if (!options.dryRun && previousResult?.status === "superseded_by_trip" && match.vehicle.mileage !== null && record.odometerEnd <= match.vehicle.mileage) {
+      results.push({ ...audit, status: "superseded_by_trip", matchBy: match.matchBy, tableId: match.vehicle.tableId, recordId: match.vehicle.recordId, plate: match.vehicle.plate, currentMileage: match.vehicle.mileage, message: "车辆公里数已由移动调度行程确认或更新" });
       continue;
     }
     if (match.vehicle.mileage !== null && record.odometerEnd < match.vehicle.mileage) {

@@ -70,7 +70,7 @@ function vehiclesWithLocalAssets<T extends { tableId: string; recordId: string; 
 function vehiclesWithMileageSource(vehicles: VehicleProfile[]): VehicleProfile[] {
   const state = trackerMileageSync.read();
   return vehicles.map((vehicle) => {
-    const audit = state.results.find((item) => item.tableId === vehicle.tableId && item.recordId === vehicle.recordId && item.status === "updated");
+    const audit = state.results.find((item) => item.tableId === vehicle.tableId && item.recordId === vehicle.recordId && (item.status === "updated" || item.status === "unchanged"));
     if (!audit || audit.reportMileage === null || vehicle.mileage !== audit.reportMileage) return vehicle;
     return {
       ...vehicle,
