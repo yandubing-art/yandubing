@@ -61,6 +61,7 @@ function vehicleWithLocalAssets<T extends { tableId: string; recordId: string; p
   // keep showing the previous thumbnail for up to a day.
   return {
     ...vehicle,
+    fleetCardPhotoUrl: remoteFleetCard,
     photoUrl: `${base}/thumbnail?v=${encodeURIComponent(photo.thumbnail.id)}`,
     photoFullUrl: `${base}/full?v=${encodeURIComponent(photo.full.id)}`
   };
