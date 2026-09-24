@@ -1,5 +1,7 @@
 # Lark 调度联动后端
 
+项目运行、部署、数据同步和排查手册见 [项目维护与交接手册](docs/项目维护与交接手册.md)。
+
 这是一个 Node.js + TypeScript 的中间后端，用于连接：
 
 1. Lark 自建应用，服务端使用 `tenant_access_token`
