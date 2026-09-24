@@ -513,19 +513,29 @@ export class LarkClient {
     const vehicle = (await this.listVehicles()).find((item) => item.tableId === tableId && item.recordId === recordId);
     const file = vehicle?.logBookAttachments.find((item) => item.fileToken === fileToken);
     if (!vehicle || !file) throw new Error("未找到该车辆的大本附件");
-    return this.downloadVehicleMedia(tableId, recordId, fileToken, file.name, "飞书大本下载失败");
+    return this.downloadVehicleMedia(tableId, recordId, vehicle.logBookField, fileToken, file.name, "飞书大本下载失败");
   }
 
   async downloadVehicleImage(tableId: string, recordId: string, fileToken: string): Promise<{ fileName: string; mimeType: string; content: Buffer }> {
     const vehicle = (await this.listVehicles()).find((item) => item.tableId === tableId && item.recordId === recordId);
     const allowed = vehicle ? [vehicle.photoFileToken, vehicle.fleetCardPhotoFileToken].filter(Boolean) : [];
     if (!vehicle || !allowed.includes(fileToken)) throw new Error("未找到该车辆图片附件");
-    const name = fileToken === vehicle.photoFileToken ? "vehicle-photo" : "fleet-card-photo";
-    return this.downloadVehicleMedia(tableId, recordId, fileToken, name, "飞书车辆图片下载失败");
+    const isPhoto = fileToken === vehicle.photoFileToken;
+    const name = isPhoto ? "vehicle-photo" : "fleet-card-photo";
+    const fieldName = isPhoto ? vehicle.photoField : vehicle.fleetCardPhotoField;
+    return this.downloadVehicleMedia(tableId, recordId, fieldName, fileToken, name, "飞书车辆图片下载失败");
   }
 
-  private async downloadVehicleMedia(tableId: string, recordId: string, fileToken: string, fileName: string, errorLabel: string): Promise<{ fileName: string; mimeType: string; content: Buffer }> {
-    const path = `/open-apis/bitable/v1/apps/${encodeURIComponent(config.bitableAppToken)}/tables/${encodeURIComponent(tableId)}/records/${encodeURIComponent(recordId)}/attachments/${encodeURIComponent(fileToken)}/download`;
+  private async downloadVehicleMedia(tableId: string, recordId: string, fieldName: string, fileToken: string, fileName: string, errorLabel: string): Promise<{ fileName: string; mimeType: string; content: Buffer }> {
+    const field = (await this.listVehicleFieldsWithOptions(tableId)).find((item) => lookupKey(item.name) === lookupKey(fieldName));
+    if (!field?.id) throw new Error(`${errorLabel}：未找到附件字段`);
+    const extra = encodeURIComponent(JSON.stringify({
+      bitablePerm: {
+        tableId,
+        attachments: { [field.id]: { [recordId]: [fileToken] } }
+      }
+    }));
+    const path = `/open-apis/drive/v1/medias/${encodeURIComponent(fileToken)}/download?extra=${extra}`;
     // Vehicle-profile writes already use the connected Base administrator. Use
     // the same identity for attachments, then retain the app-token fallback
     // for deployments that were configured before the OAuth upload flow.

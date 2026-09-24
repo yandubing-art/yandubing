@@ -44,10 +44,10 @@ function routeParam(value: string | string[] | undefined): string {
 }
 
 function vehicleWithLocalAssets<T extends { tableId: string; recordId: string; photoUrl: string; fleetCardPhotoUrl: string; photoFileToken?: string; fleetCardPhotoFileToken?: string }>(vehicle: T): T {
-  const remotePhoto = vehicle.photoUrl || ("photoFileToken" in vehicle && vehicle.photoFileToken
+  const remotePhoto = "photoFileToken" in vehicle && vehicle.photoFileToken
     ? `/api/vehicles/${encodeURIComponent(vehicle.tableId)}/${encodeURIComponent(vehicle.recordId)}/attachment/${encodeURIComponent(String(vehicle.photoFileToken))}`
-    : "");
-  const remoteFleetCard = !vehicle.fleetCardPhotoUrl && "fleetCardPhotoFileToken" in vehicle && vehicle.fleetCardPhotoFileToken
+    : vehicle.photoUrl;
+  const remoteFleetCard = "fleetCardPhotoFileToken" in vehicle && vehicle.fleetCardPhotoFileToken
     ? `/api/vehicles/${encodeURIComponent(vehicle.tableId)}/${encodeURIComponent(vehicle.recordId)}/attachment/${encodeURIComponent(String(vehicle.fleetCardPhotoFileToken))}`
     : vehicle.fleetCardPhotoUrl;
   const photo = vehicleAssets.profilePhoto(vehicle.tableId, vehicle.recordId);
