@@ -15,6 +15,8 @@ import { VehicleAssetsStore } from "./vehicle-assets-store.js";
 import { LarkPhotoSyncStore, oauthTokenData, tokenLifetimeMs } from "./lark-photo-sync-store.js";
 import { TrackerHistoryStore } from "./tracker-history-store.js";
 import { TrackerMileageSyncStore } from "./tracker-mileage-sync.js";
+import { syncStoredTrackerEmailMileage } from "./tracker-mileage-sync.js";
+import { TrackerEmailReportStore } from "./tracker-email-report.js";
 import { matchTrackerVehicle, normalizeTrackerIdentifier, trackerVehicleKey, TrackerStatusStore } from "./tracker-status-store.js";
 import type { VehicleProfile, VehicleSyncResult } from "./types.js";
 
@@ -29,6 +31,7 @@ const vehicleAssets = new VehicleAssetsStore();
 const trackerStatus = new TrackerStatusStore();
 const trackerHistory = new TrackerHistoryStore();
 const trackerMileageSync = new TrackerMileageSyncStore();
+const trackerEmailReport = new TrackerEmailReportStore();
 const app = express();
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../web");
 
@@ -108,30 +111,111 @@ function compactDispatchVehicles(vehicles: VehicleProfile[]): Array<Pick<Vehicle
   }));
 }
 
-async function syncBackendVehiclePhotos(vehicles: VehicleProfile[]): Promise<{ vehicles: VehicleProfile[]; checked: number; synced: number; failed: number }> {
+async function syncBackendVehiclePhotos(
+  vehicles: VehicleProfile[],
+  onProgress?: (completed: number, total: number) => void
+): Promise<{ vehicles: VehicleProfile[]; checked: number; synced: number; failed: number }> {
   if (!config.previewMode && !photoSync.status().active) return { vehicles, checked: 0, synced: 0, failed: 0 };
   let checked = 0;
   let synced = 0;
   let failed = 0;
-  for (const vehicle of vehicles) {
-    if (!vehicle.photoFieldConfigured) continue;
-    const upload = vehicleAssets.profilePhotoUpload(vehicle.tableId, vehicle.recordId);
-    if (!upload) continue;
+  const targets = vehicles.flatMap((vehicle) => {
+    const upload = vehicle.photoFieldConfigured ? vehicleAssets.profilePhotoUpload(vehicle.tableId, vehicle.recordId) : undefined;
+    return upload ? [{ vehicle, upload }] : [];
+  });
+  let completed = 0;
+  onProgress?.(completed, targets.length);
+  for (const { vehicle, upload } of targets) {
     checked += 1;
     const knownRemoteToken = vehicleAssets.profilePhotoRemoteToken(vehicle.tableId, vehicle.recordId);
-    if (knownRemoteToken && knownRemoteToken === (vehicle.photoFileToken || "")) continue;
-    try {
-      const remoteToken = await lark.syncBackendVehiclePhoto(vehicle, upload);
-      vehicleAssets.markProfilePhotoSynced(vehicle.tableId, vehicle.recordId, remoteToken);
-      vehicle.photoFileToken = remoteToken;
-      synced += 1;
-      console.info("Backend vehicle photo synced to Lark", { tableId: vehicle.tableId, recordId: vehicle.recordId });
-    } catch (error) {
-      failed += 1;
-      console.warn("Backend vehicle photo sync skipped", { tableId: vehicle.tableId, recordId: vehicle.recordId, error: error instanceof Error ? error.message : String(error) });
+    if (!knownRemoteToken || knownRemoteToken !== (vehicle.photoFileToken || "")) {
+      try {
+        const remoteToken = await lark.syncBackendVehiclePhoto(vehicle, upload);
+        vehicleAssets.markProfilePhotoSynced(vehicle.tableId, vehicle.recordId, remoteToken);
+        vehicle.photoFileToken = remoteToken;
+        synced += 1;
+        console.info("Backend vehicle photo synced to Lark", { tableId: vehicle.tableId, recordId: vehicle.recordId });
+      } catch (error) {
+        failed += 1;
+        console.warn("Backend vehicle photo sync skipped", { tableId: vehicle.tableId, recordId: vehicle.recordId, error: error instanceof Error ? error.message : String(error) });
+      }
     }
+    completed += 1;
+    onProgress?.(completed, targets.length);
   }
   return { vehicles, checked, synced, failed };
+}
+
+type BaseSyncState = {
+  status: "idle" | "running" | "completed" | "partial" | "failed";
+  progress: number;
+  stage: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  error?: string;
+  summary?: Record<string, unknown>;
+};
+
+let baseSyncState: BaseSyncState = {
+  status: "idle", progress: 0, stage: "尚未同步", startedAt: null, finishedAt: null
+};
+let baseSyncRunning = false;
+
+function updateBaseSync(patch: Partial<BaseSyncState>): void {
+  baseSyncState = { ...baseSyncState, ...patch };
+}
+
+async function runUnifiedBaseSync(): Promise<void> {
+  baseSyncRunning = true;
+  const summary: Record<string, unknown> = {};
+  try {
+    updateBaseSync({ status: "running", progress: 5, stage: "正在读取人员、车辆、门店和选项数据" });
+    summary.base = await lark.refreshBaseData();
+
+    updateBaseSync({ progress: 35, stage: "正在核对已下载 Tracker 报表并同步车辆公里数" });
+    const mileageResult = await syncStoredTrackerEmailMileage(lark, trackerEmailReport, trackerMileageSync);
+    const mileageFailed = mileageResult.results.filter((item) => item.status === "error").length;
+    summary.trackerMileage = {
+      status: mileageResult.status,
+      records: mileageResult.results.length,
+      updated: mileageResult.results.filter((item) => item.status === "updated").length,
+      failed: mileageFailed
+    };
+
+    updateBaseSync({ progress: 50, stage: "正在同步调度记录并更新车辆里程" });
+    summary.dispatch = await scheduler.syncOnce();
+
+    updateBaseSync({ progress: 66, stage: "正在同步后台车辆照片到多维表格" });
+    const vehicles = await lark.listVehicles();
+    const photoSyncResult = await syncBackendVehiclePhotos(vehicles, (completed, total) => {
+      updateBaseSync({
+        progress: total > 0 ? Math.min(91, 66 + Math.floor(25 * completed / total)) : 91,
+        stage: total > 0 ? `正在检查车辆照片（${completed}/${total}）` : "没有待回写的车辆照片"
+      });
+    });
+    summary.photos = photoSyncResult;
+
+    updateBaseSync({ progress: 95, stage: "正在检查保养和年检提醒" });
+    await scanVehicleReminders();
+    const hasFailures = photoSyncResult.failed > 0 || mileageFailed > 0;
+    updateBaseSync({
+      status: hasFailures ? "partial" : "completed",
+      progress: 100,
+      stage: hasFailures ? "同步完成（部分失败）" : "全部同步完成",
+      finishedAt: new Date().toISOString(),
+      summary
+    });
+  } catch (error) {
+    updateBaseSync({
+      status: "failed",
+      stage: "同步失败",
+      finishedAt: new Date().toISOString(),
+      error: error instanceof Error ? error.message : String(error),
+      summary
+    });
+  } finally {
+    baseSyncRunning = false;
+  }
 }
 
 function canViewAllVehicles(principal: RequestPrincipal): boolean {
@@ -1417,15 +1501,23 @@ app.delete("/api/vehicles/:tableId/:recordId", requirePermission("manage_vehicle
   }
 });
 
-app.post("/api/sync", requirePermission("sync_dispatch"), async (_req, res, next) => {
-  try {
-    const result = await scheduler.syncOnce();
-    await scanVehicleReminders();
-    const photoSyncResult = await syncBackendVehiclePhotos(await lark.listVehicles());
-    res.json({ ok: true, ...result, vehiclePhotosChecked: photoSyncResult.checked, vehiclePhotosSynced: photoSyncResult.synced, vehiclePhotoSyncFailed: photoSyncResult.failed });
-  } catch (error) {
-    next(error);
+app.get("/api/sync/status", requirePermission("sync_dispatch"), (_req, res) => {
+  noStore(res);
+  res.json({ ok: true, sync: baseSyncState });
+});
+
+app.post("/api/sync", requirePermission("sync_dispatch"), (_req, res) => {
+  if (!baseSyncRunning) {
+    baseSyncState = {
+      status: "running",
+      progress: 1,
+      stage: "正在准备同步",
+      startedAt: new Date().toISOString(),
+      finishedAt: null
+    };
+    void runUnifiedBaseSync();
   }
+  res.status(202).json({ ok: true, sync: baseSyncState });
 });
 
 app.post("/api/executor/callback", requireAuth, async (req, res, next) => {

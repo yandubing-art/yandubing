@@ -584,6 +584,22 @@ export class LarkClient {
     await Promise.all([this.listUsers(), this.listVehicles(), this.listStores(), this.listVehicleFieldOptions()]);
   }
 
+  async refreshBaseData(): Promise<{ users: number; vehicles: number; stores: number; optionValues: number }> {
+    this.usersCache = { expiresAt: 0, staleUntil: 0 };
+    this.vehiclesCache = { expiresAt: 0, staleUntil: 0 };
+    this.storesCache = { expiresAt: 0, staleUntil: 0 };
+    this.vehicleFieldOptionsCache = { expiresAt: 0, staleUntil: 0 };
+    const [users, vehicles, stores, options] = await Promise.all([
+      this.listUsers(), this.listVehicles(), this.listStores(), this.listVehicleFieldOptions()
+    ]);
+    return {
+      users: users.length,
+      vehicles: vehicles.length,
+      stores: stores.length,
+      optionValues: Object.values(options).reduce((count, values) => count + values.length, 0)
+    };
+  }
+
   private async listUsersFrom(requester: <T>(path: string, init?: RequestInit) => Promise<T>): Promise<UserOption[]> {
     const departmentIds = [config.contactRootDepartmentId];
     const departmentNames = new Map<string, string>();

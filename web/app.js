@@ -213,7 +213,7 @@
   // Keep Base values (such as vehicle types, store names and task status values)
   // unchanged. This catalogue only translates the application interface.
   const zhToEn = {
-    "车辆调度控制台": "Vehicle Dispatch Console", "移动设备调度": "Mobile Vehicle Dispatch", "移动设备调度 · 出发": "Mobile Vehicle Dispatch · Departure", "移动设备调度 · 中转": "Mobile Vehicle Dispatch · Transfer", "移动设备调度 · 返回": "Mobile Vehicle Dispatch · Return", "先看车况，再进入调度或车辆档案": "Review vehicle status, then dispatch or manage fleet records", "仅用于车辆出发、中转与返回登记": "For departure, transfer and return records only", "手机调度": "Mobile dispatch", "桌面调度台": "Desktop console", "车辆预约": "Vehicle reservation", "出行记录": "Trip records", "返回选择操作": "Back to action menu", "立即同步": "Sync now", "退出登录": "Sign out", "账号管理": "Account management", "通知设置": "Notification settings", "当前用户": "Signed-in user", "管理员": "Administrator", "调度员": "Dispatcher", "排程员": "Scheduler", "车队管理员": "Fleet manager", "正在加载车辆调度": "Loading vehicle dispatch", "正在确认登录状态…": "Checking sign-in status…", "正在读取账户权限…": "Reading account permissions…", "正在读取车辆和任务数据…": "Loading vehicles and tasks…", "正在打开目标页面…": "Opening the requested page…", "加载失败": "Loading failed", "请检查网络后重试": "Check the network and try again",
+    "车辆调度控制台": "Vehicle Dispatch Console", "移动设备调度": "Mobile Vehicle Dispatch", "移动设备调度 · 出发": "Mobile Vehicle Dispatch · Departure", "移动设备调度 · 中转": "Mobile Vehicle Dispatch · Transfer", "移动设备调度 · 返回": "Mobile Vehicle Dispatch · Return", "先看车况，再进入调度或车辆档案": "Review vehicle status, then dispatch or manage fleet records", "仅用于车辆出发、中转与返回登记": "For departure, transfer and return records only", "手机调度": "Mobile dispatch", "桌面调度台": "Desktop console", "车辆预约": "Vehicle reservation", "出行记录": "Trip records", "返回选择操作": "Back to action menu", "立即同步": "Sync now", "同步全部数据": "Sync all data", "同步中…": "Syncing…", "同步状态": "Sync status", "尚未同步": "Not synced yet", "正在准备同步": "Preparing sync", "正在读取人员、车辆、门店和选项数据": "Reading users, vehicles, stores and options", "正在同步调度记录并更新车辆里程": "Syncing dispatch records and updating vehicle mileage", "正在同步后台车辆照片到多维表格": "Syncing backend vehicle photos to Base", "正在检查保养和年检提醒": "Checking maintenance and inspection reminders", "正在检查车辆照片": "Checking vehicle photos", "没有待回写的车辆照片": "No vehicle photos need syncing", "全部同步完成": "All syncs completed", "同步失败": "Sync failed", "同步完成": "Sync completed", "同步进度": "Sync progress", "同步完成时间": "Finished", "人员": "People", "车辆": "Vehicles", "门店": "Stores", "调度记录": "Dispatch records", "车辆里程更新": "Vehicle mileage updates", "照片写入": "Photos written", "照片失败": "Photo failures", "退出登录": "Sign out", "账号管理": "Account management", "通知设置": "Notification settings", "当前用户": "Signed-in user", "管理员": "Administrator", "调度员": "Dispatcher", "排程员": "Scheduler", "车队管理员": "Fleet manager", "正在加载车辆调度": "Loading vehicle dispatch", "正在确认登录状态…": "Checking sign-in status…", "正在读取账户权限…": "Reading account permissions…", "正在读取车辆和任务数据…": "Loading vehicles and tasks…", "正在打开目标页面…": "Opening the requested page…", "加载失败": "Loading failed", "请检查网络后重试": "Check the network and try again",
     "选择操作": "Choose an action", "请选择本次要办理的车辆流程": "Choose the vehicle workflow to process", "出发": "Departure", "中转": "Transfer", "返回": "Return", "新建调度、登记出发公里数和车况照片": "Create a dispatch and record departure mileage and condition photos", "登记中转地点，保留在同一条调度任务中": "Record the transfer stop and keep it in the same dispatch task", "选择在途任务，登记返程公里数和车况": "Select an active task, then record return mileage and condition", "选择返程车辆": "Choose a returning vehicle", "仅显示尚未完成的调度任务": "Only unfinished dispatches are shown",
     "全部任务": "All tasks", "待处理": "Open", "执行中": "In progress", "已完成": "Completed", "失败": "Failed", "当前调度表": "Current dispatch table", "待调度 / 已排程": "Pending / scheduled", "已发送到执行器": "Sent to executor", "本次同步结果": "Latest sync result", "需要人工关注": "Needs attention",
     "车辆总览": "Fleet overview", "全部": "All", "行政部": "Administration", "维护部": "Maintenance", "运营部": "Operations", "采购部": "Procurement", "仓库部": "Warehouse", "门店部": "Stores", "已售车辆": "Sold vehicles", "添加已售车辆": "Add sold vehicle", "新增已售车辆": "Add sold vehicle", "保存已售车辆": "Save sold vehicle", "已售车辆会标记为不可调度，仅在已售车辆区域显示。": "Sold vehicles are not dispatchable and appear only in the sold vehicles area.", "请选择车辆档案表": "Select a vehicle record table", "已售车辆已添加。": "Sold vehicle added.", "没有已售车辆。": "No sold vehicles.", "全部原始车辆档案": "All source vehicle records", "全部部门 / 门店": "All departments / stores", "未设置部门 / 门店": "Department / store not set", "信息待补全": "Information to complete", "新建调度": "New dispatch", "连接后加载车辆档案。": "Connect to load vehicle records.", "调度任务": "Dispatch tasks", "调度任务列表": "Dispatch task list", "点击一条任务可在右侧时间线定位": "Select a task to locate it in the timeline", "与调度任务联动": "Linked to dispatch tasks", "任务时间线": "Task timeline", "小时": "Hour", "天": "Day", "周": "Week", "月": "Month", "年": "Year", "条任务": "tasks", "搜索任务、地点、车辆、驾驶人": "Search task, location, vehicle or driver", "全部状态": "All statuses", "已预约": "Reserved", "待调度": "Pending", "已排程": "Scheduled", "取消": "Cancelled", "按状态筛选": "Filter by status", "连接后加载任务。": "Connect to load tasks.", "任务 / 驾驶人": "Task / driver", "出发时间": "Departure time", "路线": "Route", "车辆 / 里程": "Vehicle / mileage", "状态": "Status", "结果": "Result", "删除": "Delete",
@@ -316,6 +316,11 @@
     "正在删除车辆档案…": "Deleting vehicle record…",
     "车辆档案已删除。": "Vehicle record deleted.",
     "删除车辆档案失败：": "Delete vehicle record failed: "
+  });
+  Object.assign(zhToEn, {
+    "包括车辆、门店、Tracker 报表公里数、调度记录、车辆照片与提醒": "Includes vehicles, stores, Tracker report mileage, dispatch records, vehicle photos and reminders",
+    "正在核对已下载 Tracker 报表并同步车辆公里数": "Checking the downloaded Tracker report and syncing vehicle mileage",
+    "同步完成（部分失败）": "Sync finished with some failures"
   });
   zhToEn["待填写日期"] = "Date not set";
   zhToEn["下次保养日期"] = "Next maintenance date";
@@ -633,7 +638,7 @@
     $("notificationSettingsLink").hidden = !userCan("manage_notifications");
     $("vehicleOptionsLink").hidden = !userCan("manage_vehicles");
     $("vehicleOptionsOverviewLink").hidden = !userCan("manage_vehicles");
-    $("syncButton").hidden = !userCan("sync_dispatch");
+    $("syncControl").hidden = !userCan("sync_dispatch");
     $("editVehicleButton").hidden = !userCan("manage_vehicles");
     $("deleteVehicleDetailButton").hidden = !userCan("manage_vehicles");
     $("addSoldVehicleButton").hidden = !userCan("manage_vehicles");
@@ -650,7 +655,7 @@
     $("transferSubmitButton").hidden = !userCan("submit_transfer");
     $("returnSubmitButton").hidden = !userCan("submit_return");
     if (isMobile) {
-      ["accountManagementLink", "notificationSettingsLink", "viewSwitch", "reservationLink", "historyLink", "trackerHistoryLink", "syncButton"].forEach((id) => { if ($(id)) $(id).hidden = true; });
+      ["accountManagementLink", "notificationSettingsLink", "viewSwitch", "reservationLink", "historyLink", "trackerHistoryLink", "syncControl"].forEach((id) => { if ($(id)) $(id).hidden = true; });
     } else if (!userCan("desktop_console")) {
       window.location.replace("/?view=apply");
     }
@@ -1876,15 +1881,104 @@
     history.replaceState(null, "", "?view=vehicle-options");
     if (!state.vehicleFieldDefinitions?.tables?.length) void loadVehicleOptionDefinitions();
   }
+  let unifiedSyncPollTimer = 0;
+  let unifiedSyncStartedHere = false;
+  let unifiedSyncStatusFailures = 0;
+
+  function syncStageLabel(stage) {
+    const photoMatch = String(stage || "").match(/^正在检查车辆照片（(\d+)\/(\d+)）$/);
+    if (photoMatch && state.language === "en") return `Checking vehicle photos (${photoMatch[1]}/${photoMatch[2]})`;
+    return localizeMessage(stage || "尚未同步");
+  }
+
+  function renderUnifiedSyncStatus(sync) {
+    if (!sync) return;
+    const panel = $("syncProgressPanel");
+    const button = $("syncButton");
+    const progress = Math.max(0, Math.min(100, Number(sync.progress) || 0));
+    panel.classList.toggle("is-running", sync.status === "running");
+    panel.classList.toggle("is-completed", sync.status === "completed");
+    panel.classList.toggle("is-partial", sync.status === "partial");
+    panel.classList.toggle("is-failed", sync.status === "failed");
+    $("syncProgressStage").textContent = syncStageLabel(sync.stage);
+    $("syncProgressPercent").textContent = `${progress}%`;
+    $("syncProgressBar").value = progress;
+    $("syncProgressBar").setAttribute("aria-valuetext", `${progress}%`);
+    button.disabled = sync.status === "running";
+    button.textContent = sync.status === "running" ? t("同步中…") : t("同步全部数据");
+
+    if (sync.status === "failed") {
+      $("syncProgressDetail").textContent = localizeMessage(sync.error || "同步失败");
+    } else if (sync.status === "completed") {
+      const summary = sync.summary || {};
+      const base = summary.base || {};
+      const dispatch = summary.dispatch || {};
+      const photos = summary.photos || {};
+      const mileage = summary.trackerMileage || {};
+      const mileageUpdated = (mileage.updated || 0) + (dispatch.vehicleSynced || 0);
+      const failures = (photos.failed || 0) + (mileage.failed || 0);
+      $("syncProgressDetail").textContent = state.language === "en"
+        ? `${base.users || 0} people · ${base.vehicles || 0} vehicles · ${base.stores || 0} stores · ${mileageUpdated} mileage updates · ${dispatch.scanned || 0} dispatch records · ${photos.synced || 0} photos written · ${failures} failures`
+        : `人员 ${base.users || 0} · 车辆 ${base.vehicles || 0} · 门店 ${base.stores || 0} · 里程更新 ${mileageUpdated} · 调度 ${dispatch.scanned || 0} · 照片写入 ${photos.synced || 0} · 失败 ${failures}`;
+    } else if (sync.status === "running") {
+      $("syncProgressDetail").textContent = state.language === "en" ? `Sync progress ${progress}%` : `同步进度 ${progress}%`;
+    } else {
+      $("syncProgressDetail").textContent = localizeMessage("包括车辆、门店、Tracker 报表公里数、调度记录、车辆照片与提醒");
+    }
+  }
+
+  function scheduleUnifiedSyncPoll(delay = 900) {
+    window.clearTimeout(unifiedSyncPollTimer);
+    unifiedSyncPollTimer = window.setTimeout(() => void pollUnifiedSyncStatus(), delay);
+  }
+
+  async function pollUnifiedSyncStatus() {
+    try {
+      const response = await fetch("/api/sync/status", { headers: headers() });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      unifiedSyncStatusFailures = 0;
+      const sync = payload.sync;
+      renderUnifiedSyncStatus(sync);
+      if (sync.status === "running") {
+        scheduleUnifiedSyncPoll();
+      } else if (unifiedSyncStartedHere && (sync.status === "completed" || sync.status === "partial")) {
+        unifiedSyncStartedHere = false;
+        await Promise.all([loadTasks(), loadOptions()]);
+        setNotice(sync.status === "partial" ? "同步完成（部分失败）" : "同步完成", sync.status === "partial" ? "warning" : "success");
+      } else if (unifiedSyncStartedHere && sync.status === "failed") {
+        unifiedSyncStartedHere = false;
+        setNotice(`同步失败：${sync.error || "未知错误"}`, "error");
+      }
+    } catch (error) {
+      if (unifiedSyncStartedHere) {
+        setNotice(`同步状态读取失败：${error.message}`, "error");
+        unifiedSyncStatusFailures += 1;
+        if (unifiedSyncStatusFailures <= 4) scheduleUnifiedSyncPoll(1600);
+        else {
+          unifiedSyncStartedHere = false;
+          renderUnifiedSyncStatus({ status: "failed", progress: 0, stage: "同步失败", error: error.message });
+        }
+      }
+    }
+  }
+
   async function syncNow() {
+    unifiedSyncStartedHere = true;
+    unifiedSyncStatusFailures = 0;
+    renderUnifiedSyncStatus({ status: "running", progress: 1, stage: "正在准备同步" });
     setNotice("正在执行同步…");
     try {
       const response = await fetch("/api/sync", { method: "POST", headers: headers(), body: "{}" });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
-      await loadTasks();
-      setNotice(`同步完成：扫描 ${payload.scanned} 条，入队 ${payload.queued} 条，执行 ${payload.executed} 条。`, "success");
-    } catch (error) { setNotice(`同步失败：${error.message}`, "error"); }
+      renderUnifiedSyncStatus(payload.sync);
+      scheduleUnifiedSyncPoll(300);
+    } catch (error) {
+      unifiedSyncStartedHere = false;
+      renderUnifiedSyncStatus({ status: "failed", progress: 0, stage: "同步失败", error: error.message });
+      setNotice(`同步失败：${error.message}`, "error");
+    }
   }
 
   function setDefaultDateTime(input) {
@@ -2823,6 +2917,7 @@
 
   loadCurrentUser().then(async (signedIn) => {
     if (!signedIn) return;
+    if (userCan("sync_dispatch")) void pollUnifiedSyncStatus();
     setAppLoading("正在加载车辆调度", "正在读取账户权限…");
     // Hydrate the signed-in user's cache before any remote option request.
     loadOptionsCache();

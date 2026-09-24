@@ -13,7 +13,7 @@
     <style>
       html.app-booting .shell { visibility: hidden; }
     </style>
-    <link rel="stylesheet" href="/styles.css?v=20260922-form-geometry-2" />
+    <link rel="stylesheet" href="/styles.css?v=20260924-unified-base-sync-1" />
     <link rel="stylesheet" href="/valueco-day.css?v=20260915-vehicle-compliance-1" />
     <link rel="stylesheet" href="/valueco-refined.css?v=20260915-feihong-console-static-route-1" />
   </head>
@@ -43,7 +43,14 @@
           <a id="reservationLink" class="button button-quiet" href="?view=booking">车辆预约</a>
           <a id="historyLink" class="button button-quiet" href="?view=history">出行记录</a>
           <a id="trackerHistoryLink" class="button button-quiet" href="?view=tracker-history">Tracker 回溯</a>
-          <button id="syncButton" class="button button-primary">立即同步</button>
+          <div id="syncControl" class="sync-control">
+            <button id="syncButton" class="button button-primary" type="button">同步全部数据</button>
+            <div id="syncProgressPanel" class="sync-progress" role="status" aria-live="polite">
+              <div class="sync-progress-heading"><span id="syncProgressStage">尚未同步</span><strong id="syncProgressPercent">0%</strong></div>
+              <progress id="syncProgressBar" max="100" value="0" aria-label="同步进度"></progress>
+              <small id="syncProgressDetail">包括车辆、门店、Tracker 报表公里数、调度记录、车辆照片与提醒</small>
+            </div>
+          </div>
           <button id="logoutButton" class="button button-quiet" type="button">退出登录</button>
         </div>
       </header>
@@ -244,6 +251,6 @@
       </div>
     </dialog>
     <script src="/theme.js?v=20260916-guideline-fixes-1"></script>
-    <script src="/app.js?v=20260922-maintenance-aligned-1" defer></script>
+    <script src="/app.js?v=20260924-unified-base-sync-1" defer></script>
   </body>
 </html>
