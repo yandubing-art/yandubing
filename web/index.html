@@ -13,7 +13,7 @@
     <style>
       html.app-booting .shell { visibility: hidden; }
     </style>
-    <link rel="stylesheet" href="/styles.css?v=20260924-unified-base-sync-1" />
+    <link rel="stylesheet" href="/styles.css?v=20260924-vehicle-media-thumbnails-1" />
     <link rel="stylesheet" href="/valueco-day.css?v=20260915-vehicle-compliance-1" />
     <link rel="stylesheet" href="/valueco-refined.css?v=20260915-feihong-console-static-route-1" />
   </head>
@@ -250,7 +250,13 @@
         <p id="trackerDialogNotice" class="field-hint tracker-dialog-notice" role="status" aria-live="polite" aria-atomic="true"></p>
       </div>
     </dialog>
+    <dialog id="vehicleMediaDialog" class="vehicle-media-dialog" aria-labelledby="vehicleMediaTitle">
+      <div class="vehicle-media-dialog-surface">
+        <header class="vehicle-media-dialog-header"><strong id="vehicleMediaTitle">车辆照片</strong><button type="button" data-vehicle-media-close aria-label="关闭">×</button></header>
+        <div id="vehicleMediaViewer" class="vehicle-media-viewer"></div>
+      </div>
+    </dialog>
     <script src="/theme.js?v=20260916-guideline-fixes-1"></script>
-    <script src="/app.js?v=20260924-unified-base-sync-1" defer></script>
+    <script src="/app.js?v=20260924-vehicle-media-thumbnails-1" defer></script>
   </body>
 </html>

@@ -188,6 +188,30 @@ html.low-performance .app-loading-spinner { animation:none; border-top-color:var
 .vehicle-detail-card-photo { grid-column:span 2; }
 .vehicle-detail-card-photo strong { min-height:42px; display:block; }
 .vehicle-detail-card-photo img { display:block; width:100%; max-width:220px; height:126px; margin-top:4px; border:1px solid var(--line); border-radius:9px; object-fit:cover; }
+.vehicle-detail-card-photo strong { min-height:0; }
+.vehicle-media-thumbnail { color:var(--ink); font:inherit; text-align:left; cursor:zoom-in; }
+.vehicle-photo-thumbnail { position:relative; display:grid; width:min(100%,160px); gap:5px; border:0; padding:0; background:transparent; }
+.vehicle-photo-thumbnail img { display:block; width:100%; height:96px; margin:0; border:1px solid var(--line); border-radius:8px; object-fit:contain; background:#fff; }
+.vehicle-media-thumbnail small { display:block; overflow:hidden; color:var(--muted); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.vehicle-photo-thumbnail:hover img,.vehicle-log-book-thumbnail:hover .vehicle-media-preview { border-color:var(--blue); box-shadow:0 4px 14px rgba(18,53,115,.14); }
+.vehicle-log-book { grid-column:span 2; }
+.vehicle-log-book-thumbnails { display:flex; flex-wrap:wrap; gap:10px; }
+.vehicle-log-book-thumbnail { display:grid; width:min(100%,190px); gap:5px; outline-offset:3px; }
+.vehicle-media-preview { position:relative; width:100%; height:118px; overflow:hidden; border:1px solid var(--line); border-radius:8px; background:#fff; transition:border-color .16s ease,box-shadow .16s ease; }
+.vehicle-media-preview img,.vehicle-media-preview iframe { display:block; width:100%; height:100%; border:0; object-fit:contain; background:#fff; }
+.vehicle-media-preview iframe { pointer-events:none; }
+.vehicle-document-badge { position:absolute; left:7px; bottom:7px; border-radius:4px; padding:3px 6px; color:#fff; background:#c83d48; font-size:9px; font-weight:800; }
+.vehicle-media-thumbnail-error:not([hidden]) { position:absolute; inset:0; display:grid; place-items:center; color:var(--muted); background:var(--panel-soft); font-size:11px; }
+.vehicle-media-dialog { width:min(1000px,calc(100vw - 32px)); max-width:none; max-height:calc(100dvh - 32px); padding:0; overflow:hidden; border:1px solid var(--line); border-radius:10px; background:var(--panel); color:var(--ink); box-shadow:0 26px 80px rgba(12,20,32,.4); }
+.vehicle-media-dialog::backdrop { background:rgba(6,12,22,.7); backdrop-filter:blur(4px); }
+.vehicle-media-dialog-surface { display:grid; grid-template-rows:auto minmax(0,1fr); max-height:calc(100dvh - 32px); }
+.vehicle-media-dialog-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; border-bottom:1px solid var(--line); }
+.vehicle-media-dialog-header strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vehicle-media-dialog-header button { flex:0 0 auto; width:34px; height:34px; border:1px solid var(--line); border-radius:50%; color:var(--ink); background:var(--panel-soft); font-size:21px; line-height:1; cursor:pointer; }
+.vehicle-media-viewer { display:grid; place-items:center; min-height:180px; height:min(78dvh,850px); overflow:auto; background:#10141c; }
+.vehicle-media-viewer img { display:block; max-width:100%; max-height:78dvh; object-fit:contain; }
+.vehicle-media-viewer iframe { display:block; width:min(100%,900px); height:78dvh; border:0; background:#fff; }
+.vehicle-media-error { color:#fff; font-size:14px; }
 .vehicle-detail-actions { display:flex; justify-content:flex-end; gap:10px; padding:0 22px 22px; }
 .vehicle-maintenance-panel { margin:0 22px 22px; padding:20px; border:1px solid var(--line); border-radius:16px; background:rgba(255,255,255,.035); }
 .vehicle-maintenance-panel .section-heading { margin-bottom:16px; }
@@ -406,6 +430,7 @@ footer { color:#66738b; }
 .vehicle-detail-card-photo { min-width:0; }
 .vehicle-detail-card-photo strong { min-width:0; overflow:hidden; }
 .vehicle-detail-card-photo img { display:block; width:100%; max-width:220px; height:auto; max-height:180px; object-fit:contain; object-position:left center; background:#fff; }
+.vehicle-detail-card-photo .vehicle-photo-thumbnail img { width:100%; height:96px; max-width:none; max-height:none; margin:0; border:1px solid var(--line); border-radius:8px; object-fit:contain; object-position:center; }
 
 .task-workspace { display:grid; grid-template-columns:minmax(0,1.7fr) minmax(330px,.9fr); align-items:start; border-top:1px solid var(--line); }
 .task-list-pane { min-width:0; }
