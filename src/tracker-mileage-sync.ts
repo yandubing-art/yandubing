@@ -60,7 +60,14 @@ const EMPTY_STATE: TrackerMileageSyncState = {
 };
 
 export function hasRetryableTrackerMileageResults(state: TrackerMileageSyncState): boolean {
-  return state.results.some((result) => result.status === "error");
+  return state.results.some((result) => isRetryableTrackerMileageStatus(result.status));
+}
+
+function isRetryableTrackerMileageStatus(status: TrackerMileageAuditStatus): boolean {
+  // These outcomes can become actionable after vehicle metadata is corrected:
+  // a missing mileage column can be added, and an unmatched registration can
+  // be mapped to the right vehicle. Reprocess only those rows for the same CSV.
+  return status === "error" || status === "not_found" || status === "missing_mileage_field";
 }
 
 export class TrackerMileageSyncStore {
@@ -195,7 +202,7 @@ export async function syncTrackerMileageReport(
     : new Map<string, TrackerMileageAuditRecord>();
   for (const record of report.records) {
     const previousResult = previousResults.get(record.normalizedRegistration);
-    if (previousResult && previousResult.status !== "error") {
+    if (previousResult && !isRetryableTrackerMileageStatus(previousResult.status)) {
       results.push(previousResult);
       continue;
     }

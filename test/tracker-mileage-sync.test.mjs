@@ -61,3 +61,55 @@ test("retries only failed rows from the same CSV and preserves successful audit 
   assert.equal(third.status, "unchanged");
   assert.deepEqual(attempts, ["A", "B", "B"]);
 });
+
+test("retries unmatched and missing-field rows after vehicle metadata is fixed", async (context) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "tracker-mileage-metadata-retry-"));
+  context.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const store = new TrackerMileageSyncStore(path.join(directory, "audit.json"));
+  const report = {
+    sourceHash: "same-csv-after-metadata-fix",
+    reportStart: "2026-09-22T00:00:00.000Z",
+    reportEnd: "2026-09-22T23:59:59.000Z",
+    records: ["STORE-1", "MM72ZGGP"].map((registration) => ({
+      registration,
+      normalizedRegistration: registration,
+      reportStart: "2026-09-22T00:00:00.000Z",
+      reportEnd: "2026-09-22T23:59:59.000Z",
+      odometerStart: 100,
+      odometerEnd: 125,
+      odometerEndConsistent: true,
+      sourceRows: 1
+    }))
+  };
+  store.write(report, report.records.map((record, index) => ({
+    registration: record.registration,
+    normalizedRegistration: record.normalizedRegistration,
+    status: index === 0 ? "missing_mileage_field" : "not_found",
+    currentMileage: null,
+    reportMileage: record.odometerEnd,
+    message: "previous metadata issue"
+  })));
+
+  const vehicles = report.records.map((record, index) => ({
+    tableId: index === 0 ? "stores" : "company",
+    tableName: index === 0 ? "Stores Vehicle" : "Company Vehicle",
+    recordId: record.registration,
+    plate: record.registration === "MM72ZGGP" ? "MM47ZGGP" : record.registration,
+    trackerRegistration: record.registration,
+    vehicleIdentificationNumber: "",
+    currentMileageField: "Maintenance mileage",
+    mileage: null
+  }));
+  const attempts = [];
+  const lark = {
+    listVehicles: async () => vehicles,
+    syncTrackerReportMileage: async (vehicle, mileage) => {
+      attempts.push(vehicle.recordId);
+      return { status: "updated", vehicle: { ...vehicle, mileage }, message: "updated" };
+    }
+  };
+
+  const result = await syncTrackerMileageReport(lark, report, store);
+  assert.deepEqual(attempts, ["STORE-1", "MM72ZGGP"]);
+  assert.deepEqual(result.results.map((item) => item.status), ["updated", "updated"]);
+});

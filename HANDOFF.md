@@ -55,6 +55,13 @@
 - 使用唯一虚拟车号向配置的 Gmail 收件箱发送带 CSV 附件的测试邮件；隔离状态成功收取并解析 1 条记录，只读匹配结果为 `not_found`，未写入车辆档案。测试邮件已移出收件箱，正式报表审计未被覆盖。
 - 部署时正式报表审计包含 27 辆车：14 辆 `updated`、6 辆 `missing_mileage_field`、7 辆 `not_found`；14 辆成功记录均已从飞书车辆档案回读一致。下一次真正的定时窗口为 2026-09-24 02:00–06:00（服务器当地时间），仍需在窗口结束后核对自动触发日志。
 
+2026-09-24 门店车辆公里数修复上线：
+
+- `Stores Vehicle|门店车辆` 缺少当前公里数字段，已新增 `Maintenance mileage`；`Company Vehicle|公司车辆` 已新增 `Tracker Registration`，并为 VIN `WV1ZZZSY5S9025548` 的档案补录 Tracker 编号 `MM72ZGGP`，车牌 `MM47ZGGP` 保持不变。
+- 同一 CSV 的 `missing_mileage_field` 与 `not_found` 现在会在字段或车辆匹配信息修正后重新处理；其他非错误审计状态仍按原逻辑保留。
+- 已部署 `dist/tracker-mileage-sync.js`，备份位于 `deploy-backups/tracker-mileage-retry-20260924`；重新处理 2026-09-22 报表后审计为 20 辆 `updated`、1 辆 `unchanged`、6 辆 `not_found`，没有 `error`。其中 6 辆门店车辆里程已从 Lark 回读确认：JJ16HDGP 247488、LZ26XFGP 16514、MJ50MKGP 41941、227CRCGP 18839、MJ50LKGP 15876、LN98TXGP 34428 km；Crafter 档案按 Tracker 编号匹配并写入 37422 km。
+- 其余 3 条门店档案（DD45YKZN、RJ 478、MZ95NCGP）未出现在这份 CSV，仍为空，待后续报表提供数据。`lark-dispatch` 与 `lark-tracker-sync` 已在线并保存 PM2 进程清单，生产 `/health` 返回 HTTP 200。
+
 ## 运行注意事项
 
 - 生产环境密钥、Lark OAuth 配置、Tracker 凭据和本地运行数据不提交到 GitHub；继续通过服务器环境变量维护。
