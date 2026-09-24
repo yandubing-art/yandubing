@@ -1481,7 +1481,7 @@
     const values = [];
     const seen = new Set();
     const add = (value) => { const clean = cleanDisplay(value); if (clean && !seen.has(clean)) { seen.add(clean); values.push(clean); } };
-    state.vehicles.filter((item) => !state.editingVehicle || item.tableId === state.editingVehicle.tableId).forEach((item) => add(item[property]));
+    state.vehicles.forEach((item) => add(item[property]));
     (state.vehicleFieldOptions?.[key] || []).forEach(add);
     add(current);
     return values;
@@ -2463,9 +2463,14 @@
     return `<div class="vehicle-detail-item"><span>${escapeHtml(t(label))}</span><strong>${escapeHtml(content)}</strong></div>`;
   }
 
+  function vehiclePhotoThumbnail(url, title, editorPreview = false) {
+    const previewClass = editorPreview ? " vehicle-photo-thumbnail-editor" : "";
+    return `<button class="vehicle-media-thumbnail vehicle-photo-thumbnail${previewClass}" type="button" data-vehicle-media-open="true" data-vehicle-media-kind="image" data-vehicle-media-url="${escapeHtml(url)}" data-vehicle-media-title="${escapeHtml(title)}" aria-label="${escapeHtml(title)} · ${escapeHtml(t("点击查看大图"))}"><img data-vehicle-media-thumb src="${escapeHtml(url)}" alt="${escapeHtml(title)}" width="280" height="180" loading="lazy" decoding="async" /><span class="vehicle-media-thumbnail-error" hidden>${escapeHtml(t("图片加载失败"))}</span><small>${escapeHtml(t("点击查看大图"))}</small></button>`;
+  }
+
   function vehicleDetailPhotoItem(label, url, available = true) {
     const title = t(label);
-    const content = !available ? t("本表未设置") : url ? `<button class="vehicle-media-thumbnail vehicle-photo-thumbnail" type="button" data-vehicle-media-open="true" data-vehicle-media-kind="image" data-vehicle-media-url="${escapeHtml(url)}" data-vehicle-media-title="${escapeHtml(title)}" aria-label="${escapeHtml(title)} · ${escapeHtml(t("点击查看大图"))}"><img data-vehicle-media-thumb src="${escapeHtml(url)}" alt="${escapeHtml(title)}" width="280" height="180" loading="lazy" decoding="async" /><span class="vehicle-media-thumbnail-error" hidden>${escapeHtml(t("图片加载失败"))}</span><small>${escapeHtml(t("点击查看大图"))}</small></button>` : t("未上传");
+    const content = !available ? t("本表未设置") : url ? vehiclePhotoThumbnail(url, title) : t("未上传");
     return `<div class="vehicle-detail-item vehicle-detail-card-photo"><span>${escapeHtml(title)}</span>${content}</div>`;
   }
 
@@ -2596,11 +2601,11 @@
     setInlineStatus($("vehicleDataHint"), missing.length ? `${t("待补全")}：${missing.map(t).join(state.language === "en" ? ", " : "、")}。` : t("车辆资料已完整。"), missing.length ? "error" : "success");
     $("vehicleNotice").textContent = "";
     const existingPhotoUrl = vehicle.photoFullUrl || vehicle.photoUrl;
-    $("vehiclePhotoPreview").innerHTML = existingPhotoUrl ? `<img src="${escapeHtml(existingPhotoUrl)}" alt="${escapeHtml(vehicle.plate)} ${t("车辆照片")}" width="1280" height="720" loading="lazy" decoding="async" />` : t("暂无车辆照片");
+    $("vehiclePhotoPreview").innerHTML = existingPhotoUrl ? vehiclePhotoThumbnail(existingPhotoUrl, `${vehicle.plate} ${t("车辆照片")}`, true) : t("暂无车辆照片");
     $("vehicleLogBookInput").disabled = !vehicle.logBookField;
     $("vehicleLogBookPreview").innerHTML = vehicle.logBookField ? (vehicle.logBookAttachments?.length ? vehicle.logBookAttachments.map((file) => escapeHtml(file.name)).join("<br />") : t("未上传车辆大本")) : `${t("本表未设置")} ${t("车辆大本")}`;
     $("fleetCardPhotoInput").disabled = !vehicle.fleetCardPhotoField;
-    $("fleetCardPhotoPreview").innerHTML = vehicle.fleetCardPhotoUrl ? `<img src="${escapeHtml(vehicle.fleetCardPhotoUrl)}" alt="${escapeHtml(vehicle.plate)} ${t("加油油卡图片")}" width="640" height="480" loading="lazy" decoding="async" />` : vehicle.fleetCardPhotoField ? t("暂无加油油卡图片") : `${t("本表未设置")} ${t("加油油卡图片")}`;
+    $("fleetCardPhotoPreview").innerHTML = vehicle.fleetCardPhotoUrl ? vehiclePhotoThumbnail(vehicle.fleetCardPhotoUrl, `${vehicle.plate} ${t("加油油卡图片")}`) : vehicle.fleetCardPhotoField ? t("暂无加油油卡图片") : `${t("本表未设置")} ${t("加油油卡图片")}`;
     renderVehicleEditorOptions();
     state.vehicleEditorBaseline = vehicleEditorFingerprint();
     clearFormDirty();
@@ -2653,14 +2658,14 @@
       state.vehiclePhotoFullDataUrl = variants.full;
       state.vehiclePhotoThumbnailDataUrl = variants.thumbnail;
       state.vehiclePhotoDataUrl = variants.thumbnail;
-      $("vehiclePhotoPreview").innerHTML = `<img src="${escapeHtml(variants.full)}" alt="${t("新车辆照片预览")}" width="1280" height="720" /><small>${t("建议上传清晰原图；列表使用轻量缩略图，详情页再加载高清图。")}</small>`;
+      $("vehiclePhotoPreview").innerHTML = vehiclePhotoThumbnail(variants.full, t("新车辆照片预览"), true);
     } catch (error) { setInlineStatus($("vehicleNotice"), `处理车辆照片失败：${error.message}`, "error"); }
   }
 
   async function processFleetCardPhoto(file) {
     try {
       state.fleetCardPhotoDataUrl = await preparePhoto(file, [t("加油油卡图片"), formatDate(new Date().toISOString())]);
-      $("fleetCardPhotoPreview").innerHTML = `<img src="${escapeHtml(state.fleetCardPhotoDataUrl)}" alt="${t("新加油油卡图片预览")}" width="640" height="480" />`;
+      $("fleetCardPhotoPreview").innerHTML = vehiclePhotoThumbnail(state.fleetCardPhotoDataUrl, t("新加油油卡图片预览"));
     } catch (error) { setInlineStatus($("vehicleNotice"), `处理加油油卡图片失败：${error.message}`, "error"); }
   }
 
@@ -2981,6 +2986,10 @@
     const trigger = event.target.closest("[data-vehicle-media-open]");
     if (trigger) openVehicleMedia(trigger);
   });
+  vehicleForm?.addEventListener("click", (event) => {
+    const trigger = event.target.closest("[data-vehicle-media-open]");
+    if (trigger) openVehicleMedia(trigger);
+  });
   $("vehicleDetailContent")?.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     const trigger = event.target.closest("[data-vehicle-media-open][role='button']");
@@ -2989,6 +2998,12 @@
     openVehicleMedia(trigger);
   });
   $("vehicleDetailContent")?.addEventListener("error", (event) => {
+    const image = event.target.closest?.("img[data-vehicle-media-thumb]");
+    if (!image) return;
+    const fallback = image.parentElement?.querySelector(".vehicle-media-thumbnail-error");
+    if (fallback) fallback.hidden = false;
+  }, true);
+  vehicleForm?.addEventListener("error", (event) => {
     const image = event.target.closest?.("img[data-vehicle-media-thumb]");
     if (!image) return;
     const fallback = image.parentElement?.querySelector(".vehicle-media-thumbnail-error");

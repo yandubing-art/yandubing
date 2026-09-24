@@ -853,6 +853,19 @@ export class LarkClient {
         field.options.forEach((option) => add(key, option));
       }
     }
+    // Select options alone are not enough: several vehicle tables store these
+    // fields as text. Include the values already present in every configured
+    // vehicle table so the editor can offer the same choices consistently.
+    const vehicles = await this.listVehicles();
+    for (const vehicle of vehicles) {
+      add("brand", vehicle.brand);
+      add("model", vehicle.model);
+      add("type", vehicle.vehicleType);
+      add("status", vehicle.status);
+      add("owner", vehicle.owner);
+      add("registeringAuthority", vehicle.registeringAuthority);
+      add("insurance", vehicle.insurance);
+    }
     // Store Base is the source of truth for the complete store catalogue.
     // Merge it into the owner choices so a vehicle can be assigned to a store
     // even when that store is not yet used by an existing vehicle record.
