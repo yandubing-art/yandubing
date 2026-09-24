@@ -1105,7 +1105,7 @@
     if (!address) return `<strong>${escapeHtml(t("未填写"))}</strong>`;
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
     const mapLabel = `${t("在地图中查看")}：${address}`;
-    return `<button type="button" class="tracker-location-link" data-tracker-map-url="${escapeHtml(mapUrl)}" title="${escapeHtml(t("在地图中查看"))}" aria-label="${escapeHtml(mapLabel)}"><strong>${escapeHtml(address)}</strong><span aria-hidden="true">&#8599;</span></button>`;
+    return `<a class="tracker-location-link" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(t("在地图中查看"))}" aria-label="${escapeHtml(mapLabel)}"><strong>${escapeHtml(address)}</strong><span aria-hidden="true">&#8599;</span></a>`;
   }
 
   function trackerBadge(match) {
@@ -1268,7 +1268,7 @@
         const vehicleLabel = entry.vehicle?.plate || entry.registration || t("未填写车牌");
         const vehicleMeta = entry.vehicle?.modelDescription || entry.alias || "";
         const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(entry.location || "")}`;
-        return `<tr><td><strong>${escapeHtml(trackerTime(entry.trackerTimestamp))}</strong></td><td><strong>${escapeHtml(vehicleLabel)}</strong>${vehicleMeta ? `<small class="tracker-history-meta">${escapeHtml(vehicleMeta)}</small>` : ""}</td><td><span class="tracker-actual-state">${escapeHtml(entry.status || t("未填写"))}</span></td><td><button type="button" class="tracker-history-location" data-history-map-url="${escapeHtml(mapUrl)}">${escapeHtml(entry.location || t("未填写"))}<span aria-hidden="true">&#8599;</span></button></td><td>${escapeHtml(formatMileage(entry.odometer))}</td><td>${escapeHtml(trackerTime(entry.recordedAt))}</td></tr>`;
+        return `<tr><td><strong>${escapeHtml(trackerTime(entry.trackerTimestamp))}</strong></td><td><strong>${escapeHtml(vehicleLabel)}</strong>${vehicleMeta ? `<small class="tracker-history-meta">${escapeHtml(vehicleMeta)}</small>` : ""}</td><td><span class="tracker-actual-state">${escapeHtml(entry.status || t("未填写"))}</span></td><td><a class="tracker-history-location" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.location || t("未填写"))}<span aria-hidden="true">&#8599;</span></a></td><td>${escapeHtml(formatMileage(entry.odometer))}</td><td>${escapeHtml(trackerTime(entry.recordedAt))}</td></tr>`;
       }).join("");
     }
     const canRoute = state.trackerHistoryRouteLocations.length >= 2;
@@ -1361,7 +1361,7 @@
     routeUrl.searchParams.set("destination", points.at(-1));
     routeUrl.searchParams.set("travelmode", "driving");
     if (points.length > 2) routeUrl.searchParams.set("waypoints", points.slice(1, -1).join("|"));
-    window.location.assign(routeUrl.toString());
+    window.open(routeUrl.toString(), "_blank", "noopener,noreferrer");
   }
 
   function vehicleCardMarkup(vehicle) {
@@ -3029,15 +3029,6 @@
   }));
   trackerHistoryLoadMore?.addEventListener("click", () => { void loadTrackerHistory(false); });
   trackerHistoryRouteButton?.addEventListener("click", openTrackerHistoryRoute);
-  trackerHistoryRows?.addEventListener("click", (event) => {
-    const mapButton = event.target.closest("button[data-history-map-url]");
-    if (mapButton?.dataset.historyMapUrl) window.location.assign(mapButton.dataset.historyMapUrl);
-  });
-  trackerDialogBody?.addEventListener("click", (event) => {
-    const mapButton = event.target.closest("button[data-tracker-map-url]");
-    if (!mapButton?.dataset.trackerMapUrl) return;
-    window.location.assign(mapButton.dataset.trackerMapUrl);
-  });
   trackerRefreshButton?.addEventListener("click", requestTrackerRefresh);
   trackerVehicleDialog?.querySelectorAll("[data-tracker-close]").forEach((button) => button.addEventListener("click", () => trackerVehicleDialog.close()));
   trackerVehicleDialog?.addEventListener("click", (event) => { if (event.target === trackerVehicleDialog) trackerVehicleDialog.close(); });
