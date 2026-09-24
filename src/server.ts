@@ -330,8 +330,11 @@ function cookieValue(req: Request, name: string): string {
   return item ? decodeURIComponent(item.slice(name.length + 1)) : "";
 }
 
+const sessionCookieName = "dispatch_session_v2";
+const legacySessionCookieName = "dispatch_session";
+
 function sessionPrincipal(req: Request): RequestPrincipal | null {
-  const principal = authStore.getPrincipalBySession(cookieValue(req, "dispatch_session"));
+  const principal = authStore.getPrincipalBySession(cookieValue(req, sessionCookieName));
   return principal ? { ...principal, system: false } : null;
 }
 
@@ -454,14 +457,18 @@ function applyDefaultRequester(fields: Record<string, unknown>, principal: Reque
   if (openId) fields[config.fields.requester] = [{ id: openId }];
 }
 
-function sessionCookie(token: string, maxAgeSeconds: number): string {
+function sessionCookie(token: string): string {
   const secure = config.authCookieSecure ? "; Secure" : "";
-  return `dispatch_session=${encodeURIComponent(token)}; Max-Age=${maxAgeSeconds}; Path=/; HttpOnly; SameSite=Lax${secure}`;
+  return `${sessionCookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax${secure}`;
 }
 
-function clearSessionCookie(): string {
+function clearSessionCookie(name = sessionCookieName): string {
   const secure = config.authCookieSecure ? "; Secure" : "";
-  return `dispatch_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${secure}`;
+  return `${name}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${secure}`;
+}
+
+function loginSessionCookies(token: string): string[] {
+  return [sessionCookie(token), clearSessionCookie(legacySessionCookieName)];
 }
 
 function noStore(res: Response): void {
@@ -572,8 +579,7 @@ function pruneOAuthStates(): void {
 
 function finishLogin(res: Response, principal: AuthPrincipal, nextTarget: string): void {
   const session = authStore.createSession(principal);
-  const maxAge = Math.max(1, Math.floor((session.expiresAt - Date.now()) / 1000));
-  res.setHeader("Set-Cookie", sessionCookie(session.token, maxAge));
+  res.setHeader("Set-Cookie", loginSessionCookies(session.token));
   res.json({ ok: true, redirect: nextTarget, user: principal });
 }
 
@@ -737,9 +743,9 @@ app.post("/api/auth/preview-login", (req, res) => {
 });
 
 app.post("/api/auth/logout", (req, res) => {
-  const token = cookieValue(req, "dispatch_session");
+  const token = cookieValue(req, sessionCookieName);
   if (token) authStore.deleteSession(token);
-  res.setHeader("Set-Cookie", clearSessionCookie());
+  res.setHeader("Set-Cookie", [clearSessionCookie(), clearSessionCookie(legacySessionCookieName)]);
   res.json({ ok: true });
 });
 
@@ -883,14 +889,12 @@ app.get("/api/auth/lark/callback", async (req, res) => {
     if (isAccountAdd) {
       const grantedPrincipal = authStore.getPrincipal(principal.accountId) || principal;
       const session = authStore.createSession(grantedPrincipal);
-      const maxAge = Math.max(1, Math.floor((session.expiresAt - Date.now()) / 1000));
-      res.setHeader("Set-Cookie", sessionCookie(session.token, maxAge));
+      res.setHeader("Set-Cookie", loginSessionCookies(session.token));
       res.redirect(`${stateData.next}&name=${encodeURIComponent(grantedPrincipal.displayName)}`);
       return;
     }
     const session = authStore.createSession(principal);
-    const maxAge = Math.max(1, Math.floor((session.expiresAt - Date.now()) / 1000));
-    res.setHeader("Set-Cookie", sessionCookie(session.token, maxAge));
+    res.setHeader("Set-Cookie", loginSessionCookies(session.token));
     res.redirect(stateData.admin ? (isDefaultEntryTarget(stateData.next) ? "/?view=overview" : stateData.next) : larkLoginRedirect(req, stateData.next));
   } catch (error) {
     const message = authErrorMessage(error instanceof Error ? error.message : error);
