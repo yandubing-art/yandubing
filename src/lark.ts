@@ -109,6 +109,10 @@ type DepartmentListData = {
   page_token?: string;
 };
 
+type ChatSearchData = {
+  items?: Array<{ id?: string; meta_data?: { chat_id?: string; name?: string; chat_status?: string } }>;
+};
+
 type MediaData = { file_token?: string; name?: string; size?: number; tmp_url?: string; type?: string };
 
 type VehicleTable = { tableId: string; tableName: string };
@@ -572,6 +576,34 @@ export class LarkClient {
   async listUsers(): Promise<UserOption[]> {
     if (config.previewMode) return [...this.previewUsers];
     return this.cached(this.usersCache, "directory", () => this.listUsersFrom(async <T>(path: string, init?: RequestInit) => this.request<T>(path, init)));
+  }
+
+  async searchNotificationTargets(type: "user" | "chat", query: string): Promise<NotificationTarget[]> {
+    const term = lookupKey(query).slice(0, 50);
+    if (!term) return [];
+    if (type === "user") {
+      const users = await this.listUsers();
+      return users.filter((user) => [user.name, user.enName, user.id, user.department].some((value) => lookupKey(value).includes(term)))
+        .slice(0, 20).map((user) => ({ type, id: user.id, label: user.department ? `${user.name} · ${user.department}` : user.name }));
+    }
+    if (config.previewMode) {
+      const groups = [
+        { type, id: "oc_preview_operations", label: "Operations 通知群" },
+        { type, id: "oc_preview_maintenance", label: "Maintenance 通知群" }
+      ];
+      return groups.filter((group) => lookupKey(`${group.label} ${group.id}`).includes(term));
+    }
+    const params = new URLSearchParams({ page_size: "20" });
+    const searchQuery = query.trim().slice(0, 48);
+    const data = await this.request<ChatSearchData>(`/open-apis/im/v2/chats/search?${params}`, {
+      method: "POST",
+      body: JSON.stringify({ query: searchQuery.includes("-") ? `"${searchQuery}"` : searchQuery, filter: { search_types: ["private", "public_joined", "external"], chat_modes: ["group", "topic"], disable_search_by_user: true } })
+    });
+    return (data.items || []).flatMap((item) => {
+      const id = item.meta_data?.chat_id || item.id || "";
+      if (!/^oc_[A-Za-z0-9_-]+$/.test(id) || (item.meta_data?.chat_status && item.meta_data.chat_status !== "normal")) return [];
+      return [{ type, id, label: item.meta_data?.name || id }];
+    });
   }
 
   async listUsersWithAccessToken(accessToken: string): Promise<UserOption[]> {

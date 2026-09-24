@@ -1806,11 +1806,6 @@
     return state.notificationSettings.find((rule) => rule.department === department);
   }
 
-  function notificationUserOptions(selectedId) {
-    const users = [...state.users].sort((a, b) => String(a.name).localeCompare(String(b.name)));
-    return `<option value="">选择 Lark 联系人</option>${users.map((user) => `<option value="${escapeHtml(user.id)}" ${user.id === selectedId ? "selected" : ""}>${escapeHtml(user.name)}${user.department ? " · " + escapeHtml(user.department) : ""}</option>`).join("")}`;
-  }
-
   function renderNotificationTarget(target, department, stage) {
     return `<span class="notification-target"><span>${escapeHtml(target.type === "chat" ? "群" : "人")} · ${escapeHtml(target.label || target.id)}</span><button type="button" data-notify-remove="true" data-notify-department="${escapeHtml(department)}" data-notify-stage="${escapeHtml(stage)}" data-notify-type="${escapeHtml(target.type)}" data-notify-id="${escapeHtml(target.id)}" aria-label="移除通知目标">×</button></span>`;
   }
@@ -1828,18 +1823,85 @@
       const label = rule.department === "default" ? "默认通知（未匹配部门时使用）" : ({ administration: "行政部", maintenance: "维护部", operations: "运营部", procurement: "采购部", warehouse: "仓库部", store: "门店部", tophida: "Tophida" }[rule.department] || rule.department);
       return `<section class="notification-department"><div class="notification-department-heading"><h3>${escapeHtml(label)}</h3><small>${rule.department === "default" ? "未匹配部门时使用" : "按车辆所属部门匹配"}</small></div><div class="notification-stage-grid">${notificationStages.map(([stage, stageLabel]) => {
         const targets = rule[notificationStageKey[stage]] || [];
-        return `<div class="notification-stage"><strong>${stageLabel}</strong><div class="notification-targets">${targets.length ? targets.map((target) => renderNotificationTarget(target, rule.department, stage)).join("") : `<span class="notification-empty">未设置</span>`}</div><div class="notification-add-row"><select data-notify-user="${escapeHtml(rule.department)}" data-notify-stage="${escapeHtml(stage)}">${notificationUserOptions("")}</select><button type="button" class="button button-quiet" data-notify-add-user="true" data-notify-department="${escapeHtml(rule.department)}" data-notify-stage="${escapeHtml(stage)}">添加联系人</button></div><div class="notification-add-row"><input data-notify-chat="${escapeHtml(rule.department)}" data-notify-stage="${escapeHtml(stage)}" placeholder="群聊 ID，例如 oc_xxx" /><button type="button" class="button button-quiet" data-notify-add-chat="true" data-notify-department="${escapeHtml(rule.department)}" data-notify-stage="${escapeHtml(stage)}">添加群聊</button></div></div>`;
+        return `<div class="notification-stage"><strong>${stageLabel}</strong><div class="notification-targets">${targets.length ? targets.map((target) => renderNotificationTarget(target, rule.department, stage)).join("") : `<span class="notification-empty">未设置</span>`}</div>${[ ["user", "联系人姓名或 ID", "添加联系人"], ["chat", "群名称或 oc_ 群 ID", "添加群聊"] ].map(([type, placeholder, action]) => `<div class="notification-picker"><div class="notification-add-row"><input type="text" autocomplete="off" data-notify-query="${type}" data-notify-department="${escapeHtml(rule.department)}" data-notify-stage="${escapeHtml(stage)}" placeholder="${placeholder}" aria-label="${placeholder}" /><button type="button" class="button button-quiet" data-notify-add-target="${type}" data-notify-department="${escapeHtml(rule.department)}" data-notify-stage="${escapeHtml(stage)}">${action}</button></div><div class="notification-selected" aria-live="polite" hidden></div><div class="notification-matches" hidden></div></div>`).join("")}</div>`;
       }).join("")}</div></section>`;
     }).join("")}`;
   }
 
-  function addNotificationTarget(department, stage, target) {
+  async function searchNotificationMatches(input) {
+    const query = input.value.trim();
+    const panel = input.closest(".notification-picker")?.querySelector(".notification-matches");
+    const serial = (input._notifySearchSerial || 0) + 1;
+    input._notifySearchSerial = serial;
+    input._notifyMatches = [];
+    input._notifySearchError = "";
+    if (!panel || !query) { if (panel) panel.hidden = true; return []; }
+    if (input.dataset.notifyQuery === "chat" && /^oc_[A-Za-z0-9_-]+$/.test(query)) {
+      panel.hidden = true;
+      return [{ type: "chat", id: query, label: query }];
+    }
+    panel.hidden = false;
+    panel.textContent = "正在匹配…";
+    try {
+      const params = new URLSearchParams({ type: input.dataset.notifyQuery, q: query });
+      const response = await fetch(`/api/admin/notification-targets?${params}`, { headers: headers() });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      if (!input.isConnected || input._notifySearchSerial !== serial || input.value.trim() !== query) return [];
+      const matches = Array.isArray(payload.targets) ? payload.targets : [];
+      input._notifyMatches = matches;
+      const selected = input.closest(".notification-picker")?._notifySelected;
+      panel.innerHTML = matches.length ? matches.map((target) => `<label class="notification-match"><input type="checkbox" data-notify-match="${escapeHtml(target.id)}" ${selected?.has(target.id) ? "checked" : ""} /><span>${escapeHtml(target.label)}<small>${escapeHtml(target.id)}</small></span></label>`).join("") : `<span class="notification-match-empty">没有匹配结果${input.dataset.notifyQuery === "chat" ? "，也可输入 oc_ 群 ID" : ""}</span>`;
+      return matches;
+    } catch (error) {
+      if (input.isConnected && input._notifySearchSerial === serial) {
+        const needsChatScope = input.dataset.notifyQuery === "chat" && /Access denied.*im:chat/i.test(error.message);
+        input._notifySearchError = needsChatScope ? "Lark 群搜索权限尚未开通（im:chat:read）；开通后可按群名匹配，也可继续输入 oc_ 群 ID。" : error.message;
+        panel.textContent = `匹配失败：${input._notifySearchError}`;
+      }
+      return [];
+    }
+  }
+
+  function renderNotificationSelected(picker) {
+    const selected = picker._notifySelected || new Map();
+    const container = picker.querySelector(".notification-selected");
+    const addButton = picker.querySelector("button[data-notify-add-target]");
+    container.hidden = selected.size === 0;
+    container.innerHTML = [...selected.values()].map((target) => `<button type="button" data-notify-unselect="${escapeHtml(target.id)}" aria-label="取消选择 ${escapeHtml(target.label)}">${escapeHtml(target.label)} ×</button>`).join("");
+    addButton.textContent = `${addButton.dataset.notifyAddTarget === "user" ? "添加联系人" : "添加群聊"}${selected.size ? ` (${selected.size})` : ""}`;
+  }
+
+  async function addTypedNotificationTarget(button) {
+    const picker = button.closest(".notification-picker");
+    const input = picker?.querySelector("input[data-notify-query]");
+    if (!input) return;
+    const query = input.value.trim();
+    const selected = [...(picker._notifySelected?.values() || [])];
+    if (selected.length) {
+      if (input.dataset.notifyQuery === "chat" && /^oc_[A-Za-z0-9_-]+$/.test(query) && !selected.some((item) => item.id === query)) selected.push({ type: "chat", id: query, label: query });
+      addNotificationTargets(button.dataset.notifyDepartment, button.dataset.notifyStage, selected);
+      return;
+    }
+    if (!query) { setInlineStatus($("notificationSettingsNotice"), "请先输入联系人姓名或群名称。", "error"); input.focus(); return; }
+    const matches = await searchNotificationMatches(input);
+    if (!input.isConnected || input.value.trim() !== query) return;
+    if (input._notifySearchError) { setInlineStatus($("notificationSettingsNotice"), `匹配失败：${input._notifySearchError}`, "error"); return; }
+    if (matches.length === 1) {
+      addNotificationTargets(button.dataset.notifyDepartment, button.dataset.notifyStage, matches);
+      return;
+    }
+    setInlineStatus($("notificationSettingsNotice"), matches.length ? "找到多个匹配结果，请从输入框下方选择。" : "没有匹配目标，请核对名称或 ID。", "error");
+  }
+
+  function addNotificationTargets(department, stage, additions) {
     const rule = notificationRule(department);
-    if (!rule || !target.id) return;
-    const key = `${target.type}:${target.id}`;
+    if (!rule) return;
     const targets = rule[notificationStageKey[stage]] || [];
-    if (targets.some((item) => `${item.type}:${item.id}` === key)) return;
-    targets.push({ type: target.type, id: target.id, label: target.label || target.id });
+    for (const target of additions) {
+      if (!target.id || targets.some((item) => item.type === target.type && item.id === target.id)) continue;
+      targets.push({ type: target.type, id: target.id, label: target.label || target.id });
+    }
     rule[notificationStageKey[stage]] = targets;
     renderNotificationSettings();
   }
@@ -2819,23 +2881,54 @@
   notificationSettingsContent?.addEventListener("click", (event) => {
     const remove = event.target.closest("button[data-notify-remove]");
     if (remove) { removeNotificationTarget(remove.dataset.notifyDepartment, remove.dataset.notifyStage, remove.dataset.notifyType, remove.dataset.notifyId); return; }
-    const addUser = event.target.closest("button[data-notify-add-user]");
-    if (addUser) {
-      const select = notificationSettingsContent.querySelector(`select[data-notify-user="${CSS.escape(addUser.dataset.notifyDepartment)}"][data-notify-stage="${CSS.escape(addUser.dataset.notifyStage)}"]`);
-      const user = state.users.find((item) => item.id === select?.value);
-      if (user) addNotificationTarget(addUser.dataset.notifyDepartment, addUser.dataset.notifyStage, { type: "user", id: user.id, label: user.name });
+    const unselect = event.target.closest("button[data-notify-unselect]");
+    if (unselect) {
+      const picker = unselect.closest(".notification-picker");
+      picker?._notifySelected?.delete(unselect.dataset.notifyUnselect);
+      const checkbox = [...(picker?.querySelectorAll("input[data-notify-match]") || [])].find((item) => item.dataset.notifyMatch === unselect.dataset.notifyUnselect);
+      if (checkbox) checkbox.checked = false;
+      if (picker) renderNotificationSelected(picker);
       return;
     }
-    const addChat = event.target.closest("button[data-notify-add-chat]");
-    if (addChat) {
-      const input = notificationSettingsContent.querySelector(`input[data-notify-chat="${CSS.escape(addChat.dataset.notifyDepartment)}"][data-notify-stage="${CSS.escape(addChat.dataset.notifyStage)}"]`);
-      const id = input?.value.trim() || "";
-      if (!/^oc_[A-Za-z0-9_-]+$/.test(id)) { setInlineStatus($("notificationSettingsNotice"), "群聊 ID 必须以 oc_ 开头。", "error"); return; }
-      addNotificationTarget(addChat.dataset.notifyDepartment, addChat.dataset.notifyStage, { type: "chat", id, label: id });
-      if (input) input.value = "";
+    const add = event.target.closest("button[data-notify-add-target]");
+    if (add) void addTypedNotificationTarget(add);
+  });
+  notificationSettingsContent?.addEventListener("input", (event) => {
+    const input = event.target.closest("input[data-notify-query]");
+    if (!input) return;
+    input._notifySearchSerial = (input._notifySearchSerial || 0) + 1;
+    input._notifyMatches = [];
+    clearTimeout(input._notifySearchTimer);
+    const panel = input.closest(".notification-picker")?.querySelector(".notification-matches");
+    if (panel) panel.hidden = true;
+    if (!input.value.trim()) { if (panel) panel.hidden = true; return; }
+    input._notifySearchTimer = window.setTimeout(() => void searchNotificationMatches(input), 300);
+  });
+  notificationSettingsContent?.addEventListener("keydown", (event) => {
+    const input = event.target.closest("input[data-notify-query]");
+    if (!input) return;
+    if (event.key === "Escape") {
+      const panel = input.closest(".notification-picker")?.querySelector(".notification-matches");
+      if (panel) panel.hidden = true;
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const button = input.closest(".notification-picker")?.querySelector("button[data-notify-add-target]");
+      if (button) void addTypedNotificationTarget(button);
     }
   });
   notificationSettingsContent?.addEventListener("change", (event) => {
+    const matchCheckbox = event.target.closest("input[data-notify-match]");
+    if (matchCheckbox) {
+      const picker = matchCheckbox.closest(".notification-picker");
+      const input = picker?.querySelector("input[data-notify-query]");
+      const match = input?._notifyMatches?.find((item) => item.id === matchCheckbox.dataset.notifyMatch);
+      if (!picker || !match) return;
+      picker._notifySelected ||= new Map();
+      if (matchCheckbox.checked) picker._notifySelected.set(match.id, match);
+      else picker._notifySelected.delete(match.id);
+      renderNotificationSelected(picker);
+      return;
+    }
     const field = event.target.closest("[data-reminder-field]");
     if (!field) return;
     const [kind, name] = String(field.dataset.reminderField || "").split(".");

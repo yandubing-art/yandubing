@@ -937,6 +937,20 @@ app.get("/api/admin/notification-settings", requirePermission("manage_notificati
   res.json({ ok: true, departments: notificationSettings.list(), reminders: notificationSettings.reminderRules() });
 });
 
+app.get("/api/admin/notification-targets", requirePermission("manage_notifications"), async (req, res, next) => {
+  try {
+    const type = req.query.type;
+    const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if ((type !== "user" && type !== "chat") || !query || query.length > 160) {
+      res.status(400).json({ error: "type must be user or chat and q must be 1-160 characters" });
+      return;
+    }
+    res.json({ ok: true, targets: await lark.searchNotificationTargets(type, query) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.put("/api/admin/notification-settings", requirePermission("manage_notifications"), (req, res, next) => {
   try {
     if (!Array.isArray(req.body?.departments)) {
