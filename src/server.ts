@@ -581,9 +581,18 @@ function authErrorMessage(value: unknown): string {
   return typeof value === "string" && value.length < 180 ? value : "Lark 登录失败，请稍后重试";
 }
 
-app.get("/login", (_req, res) => {
+function authenticatedLoginTarget(req: Request): string {
+  const requested = typeof req.query.next === "string" ? safeNext(req.query.next) : defaultAuthenticatedTarget(req);
+  return isDefaultEntryTarget(requested) ? defaultAuthenticatedTarget(req) : requested;
+}
+
+app.get("/login", (req, res) => {
   noStore(res);
-  res.setHeader("Set-Cookie", clearSessionCookie());
+  const principal = sessionPrincipal(req);
+  if (principal) {
+    res.redirect(authenticatedLoginTarget(req));
+    return;
+  }
   res.sendFile(path.join(webRoot, "login.html"));
 });
 
@@ -598,9 +607,13 @@ app.get("/api/vehicles/:tableId/:recordId/attachment/:fileToken", requireAnyPerm
   }
 });
 
-app.get("/admin-login", (_req, res) => {
+app.get("/admin-login", (req, res) => {
   noStore(res);
-  res.setHeader("Set-Cookie", clearSessionCookie());
+  const principal = sessionPrincipal(req);
+  if (principal) {
+    res.redirect(authenticatedLoginTarget(req));
+    return;
+  }
   res.sendFile(path.join(webRoot, "admin-login.html"));
 });
 
@@ -637,13 +650,17 @@ app.get(["/", "/index.html"], (req, res) => {
   // desktop HTML shell be reused while a mobile account is loading.
   noStore(res);
   const hasExplicitView = typeof req.query.view === "string" && Boolean(req.query.view);
+  const principal = sessionPrincipal(req);
   if (!hasExplicitView) {
+    if (principal) {
+      res.redirect(defaultAuthenticatedTarget(req));
+      return;
+    }
     const loginPath = isMobileRequest(req) ? "/login" : "/admin-login";
     const next = defaultAuthenticatedTarget(req);
     res.redirect(`${loginPath}?next=${encodeURIComponent(next)}`);
     return;
   }
-  const principal = sessionPrincipal(req);
   if (!principal) {
     const requestedView = typeof req.query.view === "string" ? req.query.view : defaultEntryView(req);
     if (requestedView === "booking") {

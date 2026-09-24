@@ -7,10 +7,6 @@
   const mobileDevice = navigator.userAgentData?.mobile === true || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(userAgent);
   const desktopDevice = /Windows NT|Macintosh|X11|Linux x86_64/i.test(userAgent);
   const desktopEnvironment = !mobileDevice && (desktopDevice || window.matchMedia?.("(min-width: 701px)").matches);
-  if (desktopEnvironment && view === "apply" && !entryMode) {
-    window.location.replace("/admin-login?next=%2F%3Fview%3Doverview");
-    return;
-  }
   const isTransferView = view === "transfer";
   const isReturnOnly = view === "return";
   const phoneLanguages = Array.isArray(navigator.languages) && navigator.languages.length ? navigator.languages : [navigator.language || "en"];
