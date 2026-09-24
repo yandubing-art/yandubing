@@ -114,7 +114,7 @@ LARK_DEFAULT_ROLE=dispatcher
 
 ## API
 
-业务接口支持登录后的 HttpOnly `dispatch_session_v2` 会话 Cookie。关闭浏览器后需重新登录；在同一次浏览器会话中切换页面仍保持登录。服务器端 Session 默认最多有效 12 小时（`AUTH_SESSION_TTL_SECONDS` 可覆盖）。调度执行器等服务端调用仍可使用以下内部请求头。未登录或权限不足时分别返回 `401` / `403`。
+业务接口支持登录后的 HttpOnly `dispatch_session_v2` 会话 Cookie。正常结束浏览器会话后需重新登录；在同一次浏览器会话中切换页面仍保持登录。若浏览器开启“恢复上次会话”，可能连会话 Cookie 一起恢复；需要在设备上关闭该选项才能严格按关闭程序清除登录。服务器端 Session 默认最多有效 12 小时（`AUTH_SESSION_TTL_SECONDS` 可覆盖）。调度执行器等服务端调用仍可使用以下内部请求头。未登录或权限不足时分别返回 `401` / `403`。
 
 服务端调用可使用以下任一请求头：
 
