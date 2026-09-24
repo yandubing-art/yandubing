@@ -186,8 +186,8 @@ function buildConfig() {
     logBook: listEnv("VEHICLE_LOG_BOOK_FIELDS", "log book | 车辆登记证书,log book,车辆登记证书,车辆大本,大本"),
     policyNumber: listEnv("VEHICLE_POLICY_NUMBER_FIELDS", "Policy Number | 保单号,Policy Number,保单号"),
     insurance: listEnv("VEHICLE_INSURANCE_FIELDS", "Insurance,保险"),
-      fleetCardPhoto: listEnv("VEHICLE_FLEET_CARD_PHOTO_FIELDS", "Fuel card picture | 加油油卡图片,Fuel card picture,加油油卡图片,Fleet card picture,车队卡照片,车卡照片"),
-      fnbFleetCard: listEnv("VEHICLE_FNB_FLEET_CARD_FIELDS", "Fuel Card | 加油油卡号,Fuel Card,加油油卡号,FNB Fleet Card,FNB车队卡,FNB 车队卡")
+      fleetCardPhoto: listEnv("VEHICLE_FLEET_CARD_PHOTO_FIELDS", "Fuel card picture | 加油油卡图片,Fuel card picture | 加油卡图片,Fuel card picture,加油油卡图片,加油卡图片,Fleet card picture,车队卡照片,车卡照片"),
+      fnbFleetCard: listEnv("VEHICLE_FNB_FLEET_CARD_FIELDS", "Fuel Card | 加油油卡号,Fuel Card | 加油卡号,Fuel Card,加油油卡号,加油卡号,FNB Fleet Card,FNB车队卡,FNB 车队卡")
   }
   };
 }

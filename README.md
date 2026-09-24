@@ -16,7 +16,7 @@
 
 `行程阶段`（单选）、`出发车辆照片`（附件）、`出发拍照时间`（日期时间）、`出发检查结果`（单选）、`出发照片备注`（多行文本）、`返程公里数`（数字）、`返程车辆照片`（附件）、`返程拍照时间`（日期时间）、`返程检查结果`（单选）、`返程照片备注`（多行文本）、`车辆损伤说明`（多行文本）。检查结果建议预置 `外观正常`、`发现损伤`、`其他` 三个选项。
 
-车辆档案表已按实际字段适配：`Number Plate | 车牌号码`、`Vehicle Brand | 车辆品牌`、`Model | 车型`、`Vehicle Type | 车辆类型`、`Vehicle Status | 车辆状态`、`Store | 所属门店`、`Department | 所属部门`、`Year | 年份`、`Vehicle Photo | 车辆照片`、`Maintenance mileage`、`Next Service Due | 下次保养里程`、`Insurance`、`Policy Number | 保单号`、`Certificate Expiry | 证书有效期`、`Fuel card picture | 加油油卡图片` 和 `Fuel Card | 加油油卡号`。后端会自动识别这些字段，也可以用 `.env` 中对应的 `VEHICLE_*_FIELDS` 覆盖。
+车辆档案表已按实际字段适配：`Number Plate | 车牌号码`、`Vehicle Brand | 车辆品牌`、`Model | 车型`、`Vehicle Type | 车辆类型`、`Vehicle Status | 车辆状态`、`Store | 所属门店`、`Department | 所属部门`、`Year | 年份`、`Vehicle Photo | 车辆照片`、`Maintenance mileage`、`Next Service Due | 下次保养里程`、`Insurance`、`Policy Number | 保单号`、`Certificate Expiry | 证书有效期`、`Fuel card picture | 加油油卡图片`（也支持 `Fuel card picture | 加油卡图片`）和 `Fuel Card | 加油油卡号`（也支持 `Fuel Card | 加油卡号`）。车辆大本字段为 `log book | 车辆登记证书`。后端会自动识别这些字段，也可以用 `.env` 中对应的 `VEHICLE_*_FIELDS` 覆盖。
 
 调度车牌下拉会自动过滤包含 `sold`、`已售`、`under maintenance`、`out of service`、`报废`、`维修中` 或 `停用` 的车辆，避免将不可用车辆派出。
 
