@@ -3084,7 +3084,7 @@
     const trigger = event.target.closest("[data-vehicle-media-open]");
     if (trigger) openVehicleMedia(trigger);
   });
-  form.addEventListener("click", (event) => {
+  $("editorView").addEventListener("click", (event) => {
     const replace = event.target.closest(".photo-replace-control");
     if (replace) {
       event.preventDefault();
@@ -3098,7 +3098,7 @@
     event.stopPropagation();
     openVehicleMedia(preview);
   });
-  form.addEventListener("keydown", (event) => {
+  $("editorView").addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     const replace = event.target.closest(".photo-replace-control");
     if (replace) {
