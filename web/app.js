@@ -2126,8 +2126,22 @@
 
   function resetPhotos(phase) {
     state.photos[phase] = {}; state.photoCapturedAt[phase] = {};
-    document.querySelectorAll(`input[data-photo-phase="${phase}"]`).forEach((input) => { input.value = ""; });
-    document.querySelectorAll(`[id^="${phase}Preview"]`).forEach((preview) => { preview.innerHTML = "＋"; preview.className = "photo-preview"; });
+    document.querySelectorAll(`input[data-photo-phase="${phase}"]`).forEach((input) => {
+      input.value = "";
+      input.removeAttribute("tabindex");
+      const slot = input.closest(".photo-slot");
+      slot?.classList.remove("has-viewable-photo");
+      slot?.querySelector(".photo-replace-control")?.remove();
+    });
+    document.querySelectorAll(`[id^="${phase}Preview"]`).forEach((preview) => {
+      preview.innerHTML = "＋"; preview.className = "photo-preview";
+      preview.removeAttribute("data-vehicle-media-open");
+      preview.removeAttribute("data-vehicle-media-kind");
+      preview.removeAttribute("data-vehicle-media-title");
+      preview.removeAttribute("role");
+      preview.removeAttribute("tabindex");
+      preview.removeAttribute("aria-label");
+    });
   }
 
   function resetEditor() {
@@ -2280,7 +2294,23 @@
         : photo.url;
       if (!preview || !url) return;
       preview.innerHTML = `<img src="${escapeHtml(url)}" alt="${escapeHtml(t("车辆照片"))}" width="640" height="480" /><small>${t("已上传")}</small>`; preview.classList.add("has-image");
+      makePhotoPreviewViewable(preview, `${t(phase === "departure" ? "出发前" : "返程")} · ${positionLabel(position)}`);
     });
+  }
+
+  function makePhotoPreviewViewable(preview, title) {
+    const slot = preview.closest(".photo-slot");
+    if (!slot) return;
+    slot.classList.add("has-viewable-photo");
+    slot.querySelector('input[type="file"]')?.setAttribute("tabindex", "-1");
+    if (!slot.querySelector(".photo-replace-control")) preview.insertAdjacentHTML("afterend", `<span class="photo-replace-control" role="button" tabindex="0">${escapeHtml(t("重新拍摄"))}</span>`);
+    preview.classList.add("photo-viewable");
+    preview.dataset.vehicleMediaOpen = "true";
+    preview.dataset.vehicleMediaKind = "image";
+    preview.dataset.vehicleMediaTitle = title;
+    preview.setAttribute("role", "button");
+    preview.tabIndex = 0;
+    preview.setAttribute("aria-label", `${title} · ${t("点击查看大图")}`);
   }
 
   function photoPreview(phase, position) {
@@ -2343,6 +2373,7 @@
       const dataUrl = await preparePhoto(file, [`${t(phase === "departure" ? "出发前" : "返程")} · ${positionLabel(position)}`, formatDate(capturedAt)]);
       state.photos[phase][position] = { position, dataUrl, capturedAt };
       const preview = photoPreview(phase, position); if (!preview) return; preview.innerHTML = `<img src="${escapeHtml(dataUrl)}" alt="${escapeHtml(positionLabel(position))} ${t("照片")}" width="640" height="480" /><small>${escapeHtml((file.size / 1024).toFixed(0))} KB · ${t("已加时间水印")}</small>`; preview.classList.add("has-image");
+      makePhotoPreviewViewable(preview, `${t(phase === "departure" ? "出发前" : "返程")} · ${positionLabel(position)}`);
       const status = phase === "departure" ? $("departurePhotoStatus") : $("returnPhotoStatus"); setInlineStatus(status, `${Object.keys(state.photos[phase]).length}/5 ${t("张照片已准备，提交时上传。")}`, "success");
     } catch (error) { setInlineStatus(phase === "departure" ? $("departurePhotoStatus") : $("returnPhotoStatus"), `处理照片失败：${error.message}`, "error"); }
   }
@@ -2561,7 +2592,7 @@
   }
 
   function openVehicleMedia(trigger) {
-    const url = trigger?.dataset.vehicleMediaUrl || "";
+    const url = trigger?.dataset.vehicleMediaUrl || trigger?.querySelector("img")?.src || "";
     const kind = trigger?.dataset.vehicleMediaKind || "image";
     if (!url || !vehicleMediaDialog || !vehicleMediaViewer) return;
     const title = trigger.dataset.vehicleMediaTitle || t("车辆照片");
@@ -3052,6 +3083,33 @@
   vehicleForm?.addEventListener("click", (event) => {
     const trigger = event.target.closest("[data-vehicle-media-open]");
     if (trigger) openVehicleMedia(trigger);
+  });
+  form.addEventListener("click", (event) => {
+    const replace = event.target.closest(".photo-replace-control");
+    if (replace) {
+      event.preventDefault();
+      event.stopPropagation();
+      replace.closest(".photo-slot")?.querySelector('input[type="file"]')?.click();
+      return;
+    }
+    const preview = event.target.closest(".photo-preview[data-vehicle-media-open]");
+    if (!preview) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openVehicleMedia(preview);
+  });
+  form.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const replace = event.target.closest(".photo-replace-control");
+    if (replace) {
+      event.preventDefault();
+      replace.closest(".photo-slot")?.querySelector('input[type="file"]')?.click();
+      return;
+    }
+    const preview = event.target.closest(".photo-preview[data-vehicle-media-open]");
+    if (!preview) return;
+    event.preventDefault();
+    openVehicleMedia(preview);
   });
   $("vehicleDetailContent")?.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;

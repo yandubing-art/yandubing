@@ -2842,3 +2842,12 @@ html[data-theme="night"] .vehicle-kicker::before { color:#9ed6ff; }
   .form-grid,
   .form-row { gap:12px; }
 }
+
+/* Existing trip photos open at full size; the separate lower area still picks a replacement. */
+.photo-slot.has-viewable-photo { padding-bottom:0; }
+.photo-slot.has-viewable-photo > input[type="file"] { inset:0 auto auto 0; width:1px; height:1px; min-height:0; pointer-events:none; }
+.photo-slot.has-viewable-photo > .photo-replace-control { display:grid; place-items:center; height:34px; margin:0; border:1px solid #cbd9fb; border-radius:9px; background:#f4f7ff; color:var(--blue); font-size:11px; font-weight:800; cursor:pointer; }
+.photo-slot.has-viewable-photo > .photo-replace-control:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+.photo-preview.photo-viewable { cursor:zoom-in; }
+.photo-preview.photo-viewable:focus-visible { outline:3px solid var(--blue); outline-offset:3px; }
+.apply-view .photo-slot.has-viewable-photo .photo-preview { height:auto; min-height:0; }
