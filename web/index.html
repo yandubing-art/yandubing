@@ -13,7 +13,7 @@
     <style>
       html.app-booting .shell { visibility: hidden; }
     </style>
-    <link rel="stylesheet" href="/styles.css?v=20260924-cross-table-options-media-3" />
+    <link rel="stylesheet" href="/styles.css?v=20260928-photo-upload-progress-1" />
     <link rel="stylesheet" href="/valueco-day.css?v=20260915-vehicle-compliance-1" />
     <link rel="stylesheet" href="/valueco-refined.css?v=20260915-feihong-console-static-route-1" />
   </head>
@@ -194,6 +194,12 @@
               <button id="formSubmitButton" class="button button-primary button-wide" type="submit">创建调度任务</button><button id="cancelEditButton" class="button button-quiet button-wide" type="button" hidden>取消编辑</button>
             </form>
 
+            <div id="departureUploadProgress" class="upload-progress" role="status" aria-live="polite" hidden>
+              <div class="upload-progress-heading"><strong data-upload-title>正在准备提交…</strong><span data-upload-percent></span></div>
+              <progress max="100" value="0" aria-label="出发照片上传进度"></progress>
+              <small data-upload-detail>请保持页面打开</small>
+            </div>
+
             <section id="transferSection" class="transfer-section" hidden>
               <div class="section-heading"><div><p class="eyebrow">TRANSFER CHECK</p><h3>中转登记</h3></div></div>
               <div id="transferTaskSummary" class="transfer-task-summary"></div>
@@ -205,6 +211,11 @@
             </section>
 
             <section id="returnSection" class="return-section" hidden><div class="section-heading"><div><p class="eyebrow">RETURN CHECK</p><h3>车辆返程登记</h3></div></div><p id="returnPhotoStatus" class="field-hint" aria-live="polite">填写返程起点和目的地，到达后填写返程公里数，并拍摄车辆四面照片。照片不采集地点。</p><div class="form-row route-form-row return-route-row"><label>返程起点<input id="returnOriginInput" name="returnOrigin" autocomplete="off" required placeholder="可手动输入地点或选择门店" /><select id="returnOriginQuickSelect" class="quick-select" aria-label="返程起点快速选择"><option value="">快速选择门店</option></select><small class="field-hint">默认从原目的地返回，也可手动修改</small></label><label>返程目的地<input id="returnDestinationInput" name="returnDestination" autocomplete="off" required placeholder="可手动输入地点或选择门店" /><select id="returnDestinationQuickSelect" class="quick-select" aria-label="返程目的地快速选择"><option value="">快速选择门店</option></select><small class="field-hint">默认返回原起点，也可手动修改</small></label></div><div class="form-grid return-grid"><label>返程公里数<input id="returnMileage" name="returnMileage" type="number" min="0" step="1" inputmode="numeric" required placeholder="如 125380" /></label><label>其他意外损伤<textarea id="damageDescription" name="damageDescription" rows="3" placeholder="无损伤可填写“无”"></textarea></label></div><div class="photo-grid"><label class="photo-slot"><span>前方</span><input name="returnPhotoFront" type="file" accept="image/*" capture="environment" data-photo-phase="return" data-photo-position="front" /><div id="returnPreviewFront" class="photo-preview">＋</div></label><label class="photo-slot"><span>后方</span><input name="returnPhotoRear" type="file" accept="image/*" capture="environment" data-photo-phase="return" data-photo-position="rear" /><div id="returnPreviewRear" class="photo-preview">＋</div></label><label class="photo-slot"><span>左侧</span><input name="returnPhotoLeft" type="file" accept="image/*" capture="environment" data-photo-phase="return" data-photo-position="left" /><div id="returnPreviewLeft" class="photo-preview">＋</div></label><label class="photo-slot"><span>右侧</span><input name="returnPhotoRight" type="file" accept="image/*" capture="environment" data-photo-phase="return" data-photo-position="right" /><div id="returnPreviewRight" class="photo-preview">＋</div></label><label class="photo-slot photo-extra"><span>补充照片（可选）</span><input name="returnPhotoExtra" type="file" accept="image/*" capture="environment" data-photo-phase="return" data-photo-position="extra" /><div id="returnPreviewExtra" class="photo-preview">＋</div></label></div><div class="form-row photo-meta"><label>检查结果<select id="returnCheckResult" name="returnCheckResult"><option>外观正常</option><option>发现损伤</option><option>其他</option></select></label><label>照片备注（可选）<textarea id="returnPhotoNotes" name="returnPhotoNotes" rows="2" placeholder="记录补充照片或需要关注的车况"></textarea></label></div><button id="returnSubmitButton" class="button button-primary button-wide" type="button">提交返程登记</button><p id="returnNotice" class="notice inline-notice" role="status"></p></section>
+            <div id="returnUploadProgress" class="upload-progress" role="status" aria-live="polite" hidden>
+              <div class="upload-progress-heading"><strong data-upload-title>正在准备提交…</strong><span data-upload-percent></span></div>
+              <progress max="100" value="0" aria-label="返程照片上传进度"></progress>
+              <small data-upload-detail>请保持页面打开</small>
+            </div>
             <p class="form-hint">照片只在提交时上传到多维表格附件字段；浏览器不会保存原图，也不会调用定位服务。</p>
           </article>
         </section>
@@ -257,6 +268,6 @@
       </div>
     </dialog>
     <script src="/theme.js?v=20260916-guideline-fixes-1"></script>
-    <script src="/app.js?v=20260928-mobile-return-form-1" defer></script>
+    <script src="/app.js?v=20260928-photo-upload-progress-1" defer></script>
   </body>
 </html>

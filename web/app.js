@@ -326,6 +326,7 @@
   zhToEn["保养日期字段"] = "Maintenance date field";
   Object.assign(zhToEn, { "自动模式": "Auto mode", "日间模式": "Day mode", "夜间模式": "Night mode", "跳到主内容": "Skip to main content", "查看出行记录": "View trip records", "保养状态": "Maintenance status", "默认当前登录人，可改选其他人员": "Defaults to the signed-in user; other personnel can be selected", "移动调度默认显示全部可调度车辆，也可按部门筛选；仅显示可调度车辆。": "Mobile dispatch shows all dispatchable vehicles by default; filter by department when needed.", "权限管理": "Permission settings", "返回选择返程任务": "Back to return task list", "返回选择中转任务": "Back to transfer task list" });
   Object.assign(zhToEn, { "未选择任务": "No task selected", "点击左侧任务查看详情、操作和时间线。": "Select a task to review its details, actions and timeline.", "任务结果": "Task result", "任务检查器": "Task inspector", "选择任务后在右侧查看处理上下文和时间线": "Select a task to review its context and timeline on the right" });
+  Object.assign(zhToEn, { "正在准备提交…": "Preparing submission…", "请保持页面打开": "Keep this page open", "正在保存调度记录…": "Saving dispatch record…", "正在上传出发照片": "Uploading departure photos", "正在上传返程照片": "Uploading return photos", "照片传输完成，服务器正在保存并同步数据…": "Photos transferred; the server is saving and syncing data…", "提交完成": "Submission complete", "正在提交…": "Submitting…" });
   const enToZh = Object.fromEntries(Object.entries(zhToEn).map(([zh, en]) => [en, zh]));
   const zhEntries = Object.entries(zhToEn).sort((a, b) => b[0].length - a[0].length);
   const enEntries = Object.entries(enToZh).sort((a, b) => b[0].length - a[0].length);
@@ -2133,6 +2134,8 @@
     state.editingRecordId = "";
     clearFormDirty();
     form.reset(); resetPhotos("departure"); resetPhotos("return");
+    hidePhotoUploadProgress("departure"); hidePhotoUploadProgress("return");
+    $("returnSubmitButton").disabled = false;
     $("formTitle").textContent = t(view === "departure" ? "出发登记" : isTransferView ? "中转登记" : "新建调度");
     $("formSubmitButton").textContent = t(view === "departure" ? "提交出发登记" : isTransferView ? "提交中转登记" : "创建调度任务");
     $("cancelEditButton").hidden = true;
@@ -2345,6 +2348,45 @@
     return true;
   }
 
+  function photoUploadPanel(phase) { return $(phase === "departure" ? "departureUploadProgress" : "returnUploadProgress"); }
+
+  function showPhotoUploadProgress(phase, title, percent = null, detail = "") {
+    const panel = photoUploadPanel(phase);
+    panel.hidden = false;
+    panel.querySelector("[data-upload-title]").textContent = t(title);
+    panel.querySelector("[data-upload-detail]").textContent = t(detail);
+    const progress = panel.querySelector("progress");
+    const percentLabel = panel.querySelector("[data-upload-percent]");
+    if (percent === null) { progress.removeAttribute("value"); percentLabel.textContent = ""; }
+    else { progress.value = Math.max(0, Math.min(100, percent)); percentLabel.textContent = `${Math.round(percent)}%`; }
+  }
+
+  function hidePhotoUploadProgress(phase) { photoUploadPanel(phase).hidden = true; }
+
+  function uploadSize(bytes) { return bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
+
+  function postPhotoJson(url, body, phase) {
+    return new Promise((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open("POST", url);
+      Object.entries(headers()).forEach(([key, value]) => request.setRequestHeader(key, value));
+      request.upload.addEventListener("progress", (event) => {
+        if (!event.lengthComputable || !event.total) return;
+        showPhotoUploadProgress(phase, phase === "departure" ? "正在上传出发照片" : "正在上传返程照片", event.loaded / event.total * 100, `${uploadSize(event.loaded)} / ${uploadSize(event.total)} · ${t("请保持页面打开")}`);
+      });
+      request.upload.addEventListener("load", () => showPhotoUploadProgress(phase, "照片传输完成，服务器正在保存并同步数据…", null, "请保持页面打开"));
+      request.addEventListener("load", () => {
+        let payload;
+        try { payload = JSON.parse(request.responseText); } catch { payload = null; }
+        if (request.status >= 200 && request.status < 300 && payload) resolve(payload);
+        else reject(new Error(payload?.error || `HTTP ${request.status}`));
+      });
+      request.addEventListener("error", () => reject(new Error("网络连接中断，请重试。")));
+      request.addEventListener("abort", () => reject(new Error("上传已中断，请重试。")));
+      try { request.send(JSON.stringify(body)); } catch (error) { reject(error); }
+    });
+  }
+
   function fieldsFromForm(data) {
     const departure = String(data.get("departureTime") || "").trim();
     const status = view === "departure" ? "执行中" : String(data.get("status") || "待调度");
@@ -2357,8 +2399,7 @@
 
   async function uploadDeparturePhotos(recordId) {
     const photos = photoPayloads("departure"); if (!photos.length) return null;
-    const response = await fetch(`/api/tasks/${encodeURIComponent(recordId)}/photos`, { method: "POST", headers: headers(), body: JSON.stringify({ phase: "departure", photos, checkResult: $("departureCheckResult").value, photoNotes: $("departurePhotoNotes").value }) });
-    const payload = await response.json(); if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`); return payload;
+    return postPhotoJson(`/api/tasks/${encodeURIComponent(recordId)}/photos`, { phase: "departure", photos, checkResult: $("departureCheckResult").value, photoNotes: $("departurePhotoNotes").value }, "departure");
   }
 
   async function saveTask(event) {
@@ -2371,8 +2412,10 @@
     if (submitButton) {
       submitButton.disabled = true;
       submitButton.dataset.originalLabel = submitButton.textContent || "";
+      submitButton.textContent = t("正在提交…");
     }
     setNotice(editing ? "正在保存调度记录…" : "正在创建调度记录…");
+    showPhotoUploadProgress("departure", "正在保存调度记录…", null, "请保持页面打开");
     try {
       const response = await fetch(editing ? `/api/tasks/${encodeURIComponent(state.editingRecordId)}` : "/api/tasks", { method: editing ? "PATCH" : "POST", headers: headers(), body: JSON.stringify(editing ? { fields } : { fields, clientToken: crypto.randomUUID() }) });
       const payload = await response.json(); if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
@@ -2383,11 +2426,12 @@
         photoMessage = ` 已上传出发照片 ${photoResult.uploaded} 张。`;
         if (photoResult.notification?.sent) photoMessage += ` 已通知 ${photoResult.notification.sent} 个 Lark 目标。`;
       }
+      showPhotoUploadProgress("departure", "提交完成", 100, "");
       const syncMessage = payload.vehicleSync?.message ? ` ${payload.vehicleSync.message}` : "";
       clearFormDirty();
       if (isMobile) { window.location.href = "?view=apply"; return; }
       resetEditor(); showOverview(); await Promise.all([loadTasks(), loadOptions()]); setNotice(editing ? `任务已更新。${photoMessage}${syncMessage}` : `任务已创建：${recordId}。${photoMessage}${syncMessage}`, "success");
-    } catch (error) { setNotice(`保存失败：${error.message}`, "error"); }
+    } catch (error) { hidePhotoUploadProgress("departure"); setNotice(`保存失败：${error.message}`, "error"); }
     finally {
       if (submitButton) {
         submitButton.disabled = false;
@@ -2398,21 +2442,30 @@
 
   async function submitReturn() {
     if (!state.editingRecordId) return setInlineStatus($("returnNotice"), "请先选择一条调度任务。", "error");
-    const mileage = Number($("returnMileage").value); if (!Number.isFinite(mileage) || mileage < 0) return setInlineStatus($("returnNotice"), "请填写有效的返程公里数。", "error");
+    const returnButton = $("returnSubmitButton");
+    if (returnButton.disabled) return;
+    const mileageText = $("returnMileage").value.trim();
+    const mileage = Number(mileageText); if (!mileageText || !Number.isFinite(mileage) || mileage < 0) return setInlineStatus($("returnNotice"), "请填写有效的返程公里数。", "error");
     if (!validatePhotoSet("return", true)) return;
+    const returnOrigin = returnOriginInput?.value.trim() || "";
+    const returnDestination = returnDestinationInput?.value.trim() || "";
+    if (!returnOrigin || !returnDestination) return setInlineStatus($("returnNotice"), "请填写返程起点和返程目的地。", "error");
+    returnButton.disabled = true;
+    showPhotoUploadProgress("return", "正在上传返程照片", 0, "请保持页面打开");
     setInlineStatus($("returnNotice"), "正在上传返程照片并回写公里数…");
     try {
-      const returnOrigin = returnOriginInput?.value.trim() || "";
-      const returnDestination = returnDestinationInput?.value.trim() || "";
-      if (!returnOrigin || !returnDestination) return setInlineStatus($("returnNotice"), "请填写返程起点和返程目的地。", "error");
-      const response = await fetch(`/api/tasks/${encodeURIComponent(state.editingRecordId)}/return`, { method: "POST", headers: headers(), body: JSON.stringify({ returnOrigin, returnDestination, returnMileage: mileage, damageDescription: $("damageDescription").value, checkResult: $("returnCheckResult").value, photoNotes: $("returnPhotoNotes").value, photos: photoPayloads("return") }) });
-      const payload = await response.json(); if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      const payload = await postPhotoJson(`/api/tasks/${encodeURIComponent(state.editingRecordId)}/return`, { returnOrigin, returnDestination, returnMileage: mileage, damageDescription: $("damageDescription").value, checkResult: $("returnCheckResult").value, photoNotes: $("returnPhotoNotes").value, photos: photoPayloads("return") }, "return");
       const notificationMessage = payload.notification?.sent ? ` 已通知 ${payload.notification.sent} 个 Lark 目标。` : "";
       clearFormDirty();
+      showPhotoUploadProgress("return", "提交完成", 100, "");
       setInlineStatus($("returnNotice"), `返程登记已完成。已上传 ${payload.photoResult?.uploaded || 0} 张照片。${notificationMessage}${payload.vehicleSync?.message || ""}`, "success");
       if (isMobile) { window.location.href = "?view=apply"; return; }
       await Promise.all([loadTasks(), loadOptions()]);
-    } catch (error) { setInlineStatus($("returnNotice"), `返程登记失败：${error.message}`, "error"); }
+    } catch (error) {
+      returnButton.disabled = false;
+      hidePhotoUploadProgress("return");
+      setInlineStatus($("returnNotice"), `返程登记失败：${error.message}`, "error");
+    }
   }
 
   async function submitTransfer(event) {
