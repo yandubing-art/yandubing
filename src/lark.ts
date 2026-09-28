@@ -1668,6 +1668,12 @@ export class LarkClient {
     if (!Number.isFinite(returnMileage) || returnMileage < 0) throw new Error("返程公里数必须是非负数字");
     const record = await this.getRecord(recordId);
     const vehicle = textValue(record.fields[config.fields.vehicle]);
+    // Keep the task eligible for retry until photos and vehicle mileage have
+    // both succeeded. A failed photo upload must not leave a completed task
+    // with an older vehicle odometer.
+    const photoResult = photos.length ? await this.attachPhotos(recordId, "return", photos, photoMeta) : undefined;
+    const match = vehicle ? await this.findVehicle(vehicle) : undefined;
+    const vehicleSync = await this.syncVehicleMileage(vehicle, returnMileage, match);
     await this.updateRecord(recordId, {
       [config.fields.returnOrigin]: returnOrigin.trim(),
       [config.fields.returnDestination]: returnDestination.trim(),
@@ -1678,10 +1684,6 @@ export class LarkClient {
       [config.fields.stage]: "已返程",
       [config.fields.status]: "已完成"
     });
-    const photoResult = photos.length ? await this.attachPhotos(recordId, "return", photos, photoMeta) : undefined;
-    await this.updateRecord(recordId, { [config.fields.stage]: "已返程" });
-    const match = vehicle ? await this.findVehicle(vehicle) : undefined;
-    const vehicleSync = await this.syncVehicleMileage(vehicle, returnMileage, match);
     return { recordId, vehicleSync, photoResult };
   }
 

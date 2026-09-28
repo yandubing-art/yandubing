@@ -2170,7 +2170,10 @@
       ? `${t("车辆返程登记")} · ${form.elements.taskNumber.value || $("vehicleSelect").value || ""}`
       : state.editingRecordId ? `${t("编辑任务")} ${form.elements.taskNumber.value || ""}` : t(currentFlow === "departure" ? "出发登记" : currentFlow === "transfer" ? "中转登记" : "新建调度");
     $("formSubmitButton").textContent = t(state.editingRecordId ? "保存修改" : currentFlow === "departure" ? "提交出发登记" : currentFlow === "transfer" ? "提交中转登记" : "创建调度任务");
-    if (isMobile) $("backToOverviewButton").textContent = t(currentFlow === "return" ? "返回选择返程任务" : currentFlow === "transfer" ? "返回选择中转任务" : "返回选择操作");
+    if (isMobile) {
+      $("backToOverviewButton").textContent = t(currentFlow === "return" ? "返回选择返程任务" : currentFlow === "transfer" ? "返回选择中转任务" : "返回选择操作");
+      $("formSubmitButton").hidden = currentFlow === "departure" ? !userCan("submit_departure") : (!userCan("create_dispatch") && !userCan("edit_own_dispatch") && !userCan("edit_all_dispatch"));
+    }
   }
 
   function ensureOption(select, value, label) {
@@ -2207,6 +2210,7 @@
       const preferredVehicle = vehicleByPlate(preferredPlate); if (preferredVehicle && vehicleDepartmentQuickSelect) vehicleDepartmentQuickSelect.value = vehicleDepartment(preferredVehicle);
       if (!isMobile) history.replaceState(null, "", `?view=edit&vehicle=${encodeURIComponent(preferredPlate)}`);
     }
+    localizeEditorChrome();
     const useTaskTransition = Boolean(task && !$("overviewView").hidden);
     if (useTaskTransition) document.documentElement.dataset.taskTransition = "active";
     const transition = showOnly("editor");
@@ -2389,7 +2393,7 @@
 
   function fieldsFromForm(data) {
     const departure = String(data.get("departureTime") || "").trim();
-    const status = view === "departure" ? "执行中" : String(data.get("status") || "待调度");
+    const status = (isMobile && state.mobileFlow === "departure") || view === "departure" ? "执行中" : String(data.get("status") || "待调度");
     const fields = { "出发时间": departure ? new Date(departure).getTime() : "", "起点": data.get("origin"), "目的地": data.get("destination"), "车辆": data.get("vehicle"), "调度状态": status };
     const mileage = String(data.get("mileage") || "").trim(); if (mileage) fields["当前公里数"] = Number(mileage);
     const next = String(data.get("nextMaintenanceMileage") || "").trim(); if (next) fields["下次保养公里数"] = Number(next);

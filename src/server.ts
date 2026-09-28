@@ -1584,6 +1584,7 @@ app.post("/api/tasks", requireAnyPermission("mobile_dispatch", "desktop_console"
     }
     const principal = res.locals.principal as RequestPrincipal;
     let preparedFields = normalizeTaskFields(fields as Record<string, unknown>);
+    if (req.get("X-Dispatch-Client") === "mobile") preparedFields[config.fields.status] = "执行中";
     if (!textValue(preparedFields[config.fields.status]).trim()) preparedFields[config.fields.status] = "待调度";
     if (textValue(preparedFields[config.fields.status]).trim() === "执行中" && !hasPermission(principal, "submit_departure")) {
       res.status(403).json({ error: "没有出发登记权限", permission: "submit_departure" });
