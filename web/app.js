@@ -2162,7 +2162,10 @@
 
   function localizeEditorChrome() {
     const currentFlow = state.mobileFlow || view;
-    $("formTitle").textContent = state.editingRecordId ? `${t("编辑任务")} ${form.elements.taskNumber.value || ""}` : t(currentFlow === "departure" ? "出发登记" : currentFlow === "transfer" ? "中转登记" : "新建调度");
+    const returnMode = document.body.classList.contains("return-mode");
+    $("formTitle").textContent = returnMode
+      ? `${t("车辆返程登记")} · ${form.elements.taskNumber.value || $("vehicleSelect").value || ""}`
+      : state.editingRecordId ? `${t("编辑任务")} ${form.elements.taskNumber.value || ""}` : t(currentFlow === "departure" ? "出发登记" : currentFlow === "transfer" ? "中转登记" : "新建调度");
     $("formSubmitButton").textContent = t(state.editingRecordId ? "保存修改" : currentFlow === "departure" ? "提交出发登记" : currentFlow === "transfer" ? "提交中转登记" : "创建调度任务");
     if (isMobile) $("backToOverviewButton").textContent = t(currentFlow === "return" ? "返回选择返程任务" : currentFlow === "transfer" ? "返回选择中转任务" : "返回选择操作");
   }
@@ -2213,7 +2216,11 @@
 
   function openReturn(task) {
     state.mobileFlow = "return";
-    openEditor(task); $("returnSection").hidden = false;
+    openEditor(task);
+    document.body.classList.add("return-mode");
+    form.hidden = true;
+    $("transferSection").hidden = true;
+    $("returnSection").hidden = false;
     localizeEditorChrome();
     $("returnSection").scrollIntoView({ behavior: contextualScrollBehavior(), block: "start" });
     history.replaceState(null, "", `?view=return&record=${encodeURIComponent(task.recordId)}`);
