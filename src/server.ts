@@ -1010,6 +1010,34 @@ app.get("/api/tasks", requireAnyPermission("mobile_dispatch", "desktop_console")
   }
 });
 
+app.get("/api/tasks/:recordId/attachment/:phase/:fileToken", requireAnyPermission("mobile_dispatch", "desktop_console"), requireAnyPermission("view_own_tasks", "view_all_tasks"), async (req, res, next) => {
+  try {
+    const recordId = routeParam(req.params.recordId);
+    const phase = routeParam(req.params.phase);
+    if (phase !== "departure" && phase !== "return") {
+      res.status(400).json({ error: "phase must be departure or return" });
+      return;
+    }
+    const principal = res.locals.principal as RequestPrincipal;
+    const record = await lark.getRecord(recordId);
+    if (!canAccessTask(taskFromRecord(record), taskAccessPrincipal(req, principal))) {
+      res.status(403).json({ error: "只能查看自己的行程照片" });
+      return;
+    }
+    const file = await lark.downloadTaskPhoto(recordId, phase, routeParam(req.params.fileToken), record);
+    if (!/^image\/(?:jpeg|png|webp|gif|avif|bmp)$/i.test(file.mimeType)) {
+      res.status(415).json({ error: "行程附件不是图片" });
+      return;
+    }
+    noStore(res);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.type(file.mimeType);
+    res.send(file.content);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/bookings", requireAnyPermission("mobile_dispatch", "desktop_console"), requirePermission("book_vehicle"), async (req, res, next) => {
   try {
     const input = req.body?.fields;

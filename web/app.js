@@ -2275,8 +2275,11 @@
     if (!photos?.length) return;
     photos.slice(0, 5).forEach((photo, index) => {
       const position = allPhotoPositions[index]; const preview = photoPreview(phase, position);
-      if (!preview || !photo.url) return;
-      preview.innerHTML = `<img src="${escapeHtml(photo.url)}" alt="${escapeHtml(photo.name)}" width="640" height="480" /><small>${t("已上传")}</small>`; preview.classList.add("has-image");
+      const url = photo.fileToken && !photo.fileToken.startsWith("preview_file_")
+        ? `/api/tasks/${encodeURIComponent(task.recordId)}/attachment/${phase}/${encodeURIComponent(photo.fileToken)}`
+        : photo.url;
+      if (!preview || !url) return;
+      preview.innerHTML = `<img src="${escapeHtml(url)}" alt="${escapeHtml(t("车辆照片"))}" width="640" height="480" /><small>${t("已上传")}</small>`; preview.classList.add("has-image");
     });
   }
 

@@ -530,6 +530,15 @@ export class LarkClient {
     return this.downloadVehicleMedia(tableId, recordId, fieldName, fileToken, name, "飞书车辆图片下载失败");
   }
 
+  async downloadTaskPhoto(recordId: string, phase: "departure" | "return", fileToken: string, currentRecord?: BitableRecord): Promise<{ fileName: string; mimeType: string; content: Buffer }> {
+    const fieldName = phase === "departure" ? config.fields.departurePhotos : config.fields.returnPhotos;
+    const record = currentRecord || await this.getRecord(recordId);
+    if (record.record_id !== recordId) throw new Error("行程照片与任务记录不匹配");
+    const file = attachmentValues(record.fields[fieldName]).find((item) => item.fileToken === fileToken);
+    if (!file) throw Object.assign(new Error("未找到该行程照片附件"), { statusCode: 404 });
+    return this.downloadVehicleMedia(config.bitableTableId, recordId, fieldName, fileToken, file.name, "飞书行程照片下载失败");
+  }
+
   private async downloadVehicleMedia(tableId: string, recordId: string, fieldName: string, fileToken: string, fileName: string, errorLabel: string): Promise<{ fileName: string; mimeType: string; content: Buffer }> {
     const field = (await this.listVehicleFieldsWithOptions(tableId)).find((item) => lookupKey(item.name) === lookupKey(fieldName));
     if (!field?.id) throw new Error(`${errorLabel}：未找到附件字段`);
