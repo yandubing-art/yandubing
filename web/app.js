@@ -129,6 +129,7 @@
   const bookingRows = $("bookingRows");
   const searchInput = $("searchInput");
   const statusFilter = $("statusFilter");
+  const vehicleSearchInput = $("vehicleSearchInput");
   const vehicleDepartmentFilter = $("vehicleDepartmentFilter");
   const vehicleDepartmentQuickSelect = $("vehicleDepartmentQuickSelect");
   const bookingVehicleDepartmentQuickSelect = $("bookingVehicleDepartmentQuickSelect");
@@ -197,6 +198,7 @@
 
   function restoreFilterState() {
     if (searchInput) searchInput.value = params.get("taskSearch") || "";
+    if (vehicleSearchInput) vehicleSearchInput.value = params.get("vehicleSearch") || "";
     if (statusFilter) statusFilter.value = params.get("taskStatus") || "";
     if ($("timelineDateFrom")) $("timelineDateFrom").value = params.get("timelineDateFrom") || "";
     if ($("timelineDateTo")) $("timelineDateTo").value = params.get("timelineDateTo") || "";
@@ -326,6 +328,7 @@
   zhToEn["保养日期字段"] = "Maintenance date field";
   Object.assign(zhToEn, { "自动模式": "Auto mode", "日间模式": "Day mode", "夜间模式": "Night mode", "跳到主内容": "Skip to main content", "查看出行记录": "View trip records", "保养状态": "Maintenance status", "默认当前登录人，可改选其他人员": "Defaults to the signed-in user; other personnel can be selected", "移动调度默认显示全部可调度车辆，也可按部门筛选；仅显示可调度车辆。": "Mobile dispatch shows all dispatchable vehicles by default; filter by department when needed.", "权限管理": "Permission settings", "返回选择返程任务": "Back to return task list", "返回选择中转任务": "Back to transfer task list" });
   Object.assign(zhToEn, { "未选择任务": "No task selected", "点击左侧任务查看详情、操作和时间线。": "Select a task to review its details, actions and timeline.", "任务结果": "Task result", "任务检查器": "Task inspector", "选择任务后在右侧查看处理上下文和时间线": "Select a task to review its context and timeline on the right" });
+  Object.assign(zhToEn, { "搜索车牌、品牌或车型": "Search plate, brand or model", "没有匹配的车辆，请调整搜索或部门筛选。": "No matching vehicles. Change the search or department filter." });
   Object.assign(zhToEn, { "正在准备提交…": "Preparing submission…", "请保持页面打开": "Keep this page open", "正在保存调度记录…": "Saving dispatch record…", "正在上传出发照片": "Uploading departure photos", "正在上传返程照片": "Uploading return photos", "照片传输完成，服务器正在保存并同步数据…": "Photos transferred; the server is saving and syncing data…", "提交完成": "Submission complete", "正在提交…": "Submitting…" });
   const enToZh = Object.fromEntries(Object.entries(zhToEn).map(([zh, en]) => [en, zh]));
   const zhEntries = Object.entries(zhToEn).sort((a, b) => b[0].length - a[0].length);
@@ -1394,7 +1397,10 @@
     if (!container) return;
     if (!state.vehicles.length) { $("vehicleDataCount").textContent = t("没有读取到车辆档案。"); container.innerHTML = `<div class="empty-card">${t("没有读取到车辆档案。")}</div>`; if (soldContainer) soldContainer.innerHTML = ""; return; }
     const filter = vehicleDepartmentFilter?.value || "";
+    const query = vehicleSearchInput?.value.trim().toLocaleLowerCase() || "";
     const filteredVehicles = state.vehicles.filter((vehicle) => {
+      if (query && ![vehicle.plate, vehicle.brand, vehicle.model, vehicle.modelDescription, vehicle.owner]
+        .some((value) => String(value || "").toLocaleLowerCase().includes(query))) return false;
       if (!filter) return true;
       if (filter === "sold") return isSoldVehicle(vehicle);
       return vehicleDepartment(vehicle) === filter;
@@ -1403,11 +1409,12 @@
     const activeVehicles = filteredVehicles.filter((vehicle) => !isSoldVehicle(vehicle));
     const showingSold = filter === "sold";
     $("vehicleDataCount").textContent = `${showingSold ? soldVehicles.length : activeVehicles.length} / ${state.vehicles.length}`;
-    renderVehicleCards(container, showingSold ? soldVehicles : activeVehicles, t(showingSold ? "没有已售车辆。" : "这个部门 / 门店暂无匹配车辆。"));
+    renderVehicleCards(container, showingSold ? soldVehicles : activeVehicles, t(query ? "没有匹配的车辆，请调整搜索或部门筛选。" : showingSold ? "没有已售车辆。" : "这个部门 / 门店暂无匹配车辆。"));
     if (soldContainer) {
       renderVehicleCards(soldContainer, soldVehicles, t("没有已售车辆。"));
       $("soldVehicleCount").textContent = String(soldVehicles.length);
       $("soldVehiclesPanel").hidden = showingSold;
+      if (query && !activeVehicles.length && soldVehicles.length) $("soldVehiclesPanel").open = true;
     }
   }
 
@@ -2970,6 +2977,7 @@
   searchInput?.addEventListener("input", () => { updateQueryState({ taskSearch: searchInput.value.trim() }); renderRows(); });
   statusFilter?.addEventListener("change", () => { state.quickStatusFilter = ""; updateQueryState({ taskStatus: statusFilter.value }); renderRows(); });
   vehicleDepartmentFilter?.addEventListener("change", renderVehicles);
+  vehicleSearchInput?.addEventListener("input", () => { updateQueryState({ vehicleSearch: vehicleSearchInput.value.trim() }); renderVehicles(); });
   [[historySearchInput, "historySearch"], [historyVehicleFilter, "historyVehicle"], [historyRequesterFilter, "historyRequester"], [historyStatusFilter, "historyStatus"], [historyDateFrom, "historyDateFrom"], [historyDateTo, "historyDateTo"]].forEach(([input, key]) => input?.addEventListener(input === historySearchInput ? "input" : "change", () => { updateQueryState({ [key]: input.value.trim() }); renderHistory(); }));
   form.addEventListener("submit", saveTask);
   transferForm?.addEventListener("submit", submitTransfer);

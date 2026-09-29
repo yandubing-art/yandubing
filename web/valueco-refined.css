@@ -249,3 +249,43 @@ html[data-theme] .return-action .mobile-action-icon { color:var(--vc-refined-suc
   html[data-theme] .mobile-action:hover { border-color:color-mix(in srgb,var(--blue) 50%,var(--line)); box-shadow:0 16px 34px color-mix(in srgb,var(--blue) 12%,transparent); }
 }
 @media (max-width:650px) { html[data-theme] body { background-attachment:scroll; } }
+/* Keep the console title readable when the navigation grows with permissions. */
+html[data-theme] body:not(.apply-view) .topbar {
+  grid-template-columns:minmax(0,1fr);
+  align-items:start;
+  gap:14px;
+}
+html[data-theme] body:not(.apply-view) .title-row {
+  grid-template-columns:max-content max-content max-content;
+  justify-content:start;
+}
+html[data-theme] body:not(.apply-view) .title-row h1 {
+  overflow-wrap:normal;
+  word-break:keep-all;
+}
+html[data-theme] body:not(.apply-view) .top-actions {
+  width:100%;
+  justify-content:flex-start;
+}
+html[data-theme] .fleet-actions #vehicleSearchInput {
+  flex:1 1 220px;
+  width:min(260px,100%);
+  min-width:180px;
+}
+@media (max-width:650px) {
+  html[data-theme] body:not(.apply-view) .title-row {
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"title title" "language theme";
+  }
+  html[data-theme] body:not(.apply-view) .title-row h1 {
+    width:100%;
+    white-space:normal;
+    overflow-wrap:anywhere;
+  }
+  html[data-theme] .fleet-actions #vehicleSearchInput {
+    grid-column:1/-1;
+    width:100%;
+    min-width:0;
+    min-height:44px;
+  }
+}

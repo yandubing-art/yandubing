@@ -15,7 +15,7 @@
     </style>
     <link rel="stylesheet" href="/styles.css?v=20260928-trip-photo-viewer-1" />
     <link rel="stylesheet" href="/valueco-day.css?v=20260915-vehicle-compliance-1" />
-    <link rel="stylesheet" href="/valueco-refined.css?v=20260915-feihong-console-static-route-1" />
+    <link rel="stylesheet" href="/valueco-refined.css?v=20260929-fleet-search-header-1" />
   </head>
   <body>
     <div id="appLoadingOverlay" class="app-loading-overlay is-visible" role="status" aria-live="polite" aria-atomic="true">
@@ -110,7 +110,7 @@
             <div class="table-wrap"><table><thead><tr><th>预约人</th><th>预约出发时间</th><th>路线</th><th>车辆</th><th>状态</th><th>操作</th></tr></thead><tbody id="bookingRows"><tr><td colspan="6" class="empty">正在读取车辆预约。</td></tr></tbody></table></div>
           </article>
           <article class="panel fleet-panel">
-            <div class="panel-heading"><div><p class="eyebrow">FLEET OVERVIEW</p><h2>车辆总览 <small id="vehicleDataCount" class="fleet-count">载入中</small></h2></div><div class="fleet-actions"><select id="vehicleDepartmentFilter" aria-label="按部门分类"><option value="">全部</option><option value="administration">行政部</option><option value="maintenance">维护部</option><option value="operations">运营部</option><option value="procurement">采购部</option><option value="warehouse">仓库部</option><option value="store">门店部</option></select><a id="vehicleOptionsOverviewLink" class="button button-quiet" href="?view=vehicle-options" hidden>编辑车辆选项</a><a class="button button-quiet" href="?view=booking">车辆预约</a><button id="newTaskButton" class="button button-primary">新建调度</button></div></div>
+            <div class="panel-heading"><div><p class="eyebrow">FLEET OVERVIEW</p><h2>车辆总览 <small id="vehicleDataCount" class="fleet-count" role="status" aria-live="polite">载入中</small></h2></div><div class="fleet-actions"><input id="vehicleSearchInput" type="search" autocomplete="off" aria-label="搜索车牌、品牌或车型" placeholder="搜索车牌、品牌或车型" /><select id="vehicleDepartmentFilter" aria-label="按部门分类"><option value="">全部</option><option value="administration">行政部</option><option value="maintenance">维护部</option><option value="operations">运营部</option><option value="procurement">采购部</option><option value="warehouse">仓库部</option><option value="store">门店部</option></select><a id="vehicleOptionsOverviewLink" class="button button-quiet" href="?view=vehicle-options" hidden>编辑车辆选项</a><a class="button button-quiet" href="?view=booking">车辆预约</a><button id="newTaskButton" class="button button-primary">新建调度</button></div></div>
             <div id="vehicleCards" class="vehicle-cards"><div class="empty-card">连接后加载车辆档案。</div></div>
             <details id="soldVehiclesPanel" class="sold-vehicles-panel"><summary><span>已售车辆</span><small id="soldVehicleCount">0</small><button id="addSoldVehicleButton" class="sold-vehicle-add" type="button" hidden>＋ 添加已售车辆</button></summary><div id="soldVehicleCards" class="vehicle-cards sold-vehicle-cards"></div></details>
           </article>
@@ -268,6 +268,6 @@
       </div>
     </dialog>
     <script src="/theme.js?v=20260916-guideline-fixes-1"></script>
-    <script src="/app.js?v=20260928-return-photo-viewer-1" defer></script>
+    <script src="/app.js?v=20260929-fleet-search-header-1" defer></script>
   </body>
 </html>
