@@ -1388,16 +1388,21 @@
       return `<article class="vehicle-card"><div class="vehicle-image">${photo}</div><div class="vehicle-card-body"><div class="vehicle-kicker">${escapeHtml(department)}</div><div class="vehicle-model">${escapeHtml(vehicle.modelDescription || t("车型未配置"))}</div><div class="vehicle-plate">${escapeHtml(vehicle.plate || t("未填写车牌"))}</div><div class="vehicle-specs"><span><small>${t("年份")}</small><strong>${escapeHtml(year)}</strong></span><span class="mileage-cell"><small>${t("当前公里数")}</small><span class="mileage-value-line"><strong class="${vehicle.mileageSource ? "tracker-mileage-value" : ""}">${escapeHtml(mileage)}</strong>${mileageSource}</span></span></div><div class="vehicle-maintenance-row"><span>${t("下次保养")}</span><strong>${escapeHtml(nextMaintenance)}</strong></div><div class="vehicle-maintenance-row"><span>${t("下次保养日期")}</span><strong>${escapeHtml(nextMaintenanceDate)}</strong></div><div class="vehicle-maintenance-row"><span>${t("年检到期日期")}</span><strong>${escapeHtml(inspectionExpiry)}</strong></div>${completeness}<div class="vehicle-card-status">${state.trackerStatus ? trackerBadge(trackerMatch) : ""}${reminderBadge(maintenance)}${reminderBadge(inspection)}</div><div class="vehicle-actions"><button class="vehicle-dispatch" data-new-plate="${escapeHtml(vehicle.plate)}" ${vehicle.dispatchEligible ? "" : "disabled"}>${t(vehicle.dispatchEligible ? "用此车新建调度" : "不可新建调度")}</button>${managementAction}<button class="vehicle-locate" type="button" data-tracker-table="${escapeHtml(vehicle.tableId)}" data-tracker-record="${escapeHtml(vehicle.recordId)}">${t("车辆位置状态")}</button></div></div></article>`;
   }
 
+  const vehicleCardsMarkup = new WeakMap();
+
   function renderVehicleCards(container, vehicles, emptyMessage) {
     if (!container) return;
-    container.innerHTML = vehicles.length ? vehicles.map(vehicleCardMarkup).join("") : `<div class="empty-card">${emptyMessage}</div>`;
+    const markup = vehicles.length ? vehicles.map(vehicleCardMarkup).join("") : emptyMessage ? `<div class="empty-card">${emptyMessage}</div>` : "";
+    if (vehicleCardsMarkup.get(container) === markup) return;
+    container.innerHTML = markup;
+    vehicleCardsMarkup.set(container, markup);
   }
 
   function renderVehicles() {
     const container = $("vehicleCards");
     const soldContainer = $("soldVehicleCards");
     if (!container) return;
-    if (!state.vehicles.length) { $("vehicleDataCount").textContent = t("没有读取到车辆档案。"); container.innerHTML = `<div class="empty-card">${t("没有读取到车辆档案。")}</div>`; if (soldContainer) soldContainer.innerHTML = ""; return; }
+    if (!state.vehicles.length) { $("vehicleDataCount").textContent = t("没有读取到车辆档案。"); renderVehicleCards(container, [], t("没有读取到车辆档案。")); if (soldContainer) renderVehicleCards(soldContainer, [], ""); return; }
     const filter = vehicleDepartmentFilter?.value || "";
     const query = vehicleSearchInput?.value.trim().toLocaleLowerCase() || "";
     const filteredVehicles = state.vehicles.filter((vehicle) => {
@@ -1676,19 +1681,24 @@
       try {
         const payload = await fetchOptionPayload(endpoint);
         state[key] = key === "vehicleFieldOptions" ? (payload.options || {}) : key === "vehicleFieldDefinitions" ? { tables: payload.tables || [] } : (payload[key] || []);
-        saveOptionsCache();
+        if (key !== "vehicleFieldDefinitions") saveOptionsCache();
         if (isMobile && key === "vehicles") {
           // Paint the small, usable vehicle selector before rendering the
           // large directory and desktop-only vehicle panels.
           renderDispatchVehicleOptions();
           window.setTimeout(() => renderOptions(), 0);
-        } else {
+        } else if (key === "users" || key === "vehicles" || key === "stores") {
           renderOptions();
         }
         if (!isMobile) {
-          renderVehicleDepartmentFilter(); renderVehicles(); renderRows(); renderHistory(); renderTrackerHistoryVehicleOptions();
-          renderVehicleEditorOptions();
-          renderVehicleOptionDefinitions();
+          if (key === "vehicles") {
+            renderVehicleDepartmentFilter(); renderVehicles(); renderTrackerHistoryVehicleOptions();
+          }
+          if (key === "users" || key === "vehicles" || key === "stores") {
+            renderRows(); renderHistory();
+          }
+          if (key !== "users") renderVehicleEditorOptions();
+          if (key === "vehicleFieldDefinitions") renderVehicleOptionDefinitions();
         }
       } catch (error) {
         errors.push(`${label}：${error.message}`);
@@ -2992,7 +3002,14 @@
   searchInput?.addEventListener("input", () => { updateQueryState({ taskSearch: searchInput.value.trim() }); renderRows(); });
   statusFilter?.addEventListener("change", () => { state.quickStatusFilter = ""; updateQueryState({ taskStatus: statusFilter.value }); renderRows(); });
   vehicleDepartmentFilter?.addEventListener("change", renderVehicles);
-  vehicleSearchInput?.addEventListener("input", () => { updateQueryState({ vehicleSearch: vehicleSearchInput.value.trim() }); renderVehicles(); });
+  let vehicleSearchTimer = 0;
+  vehicleSearchInput?.addEventListener("input", () => {
+    window.clearTimeout(vehicleSearchTimer);
+    vehicleSearchTimer = window.setTimeout(() => {
+      updateQueryState({ vehicleSearch: vehicleSearchInput.value.trim() });
+      renderVehicles();
+    }, 150);
+  });
   [[historySearchInput, "historySearch"], [historyVehicleFilter, "historyVehicle"], [historyRequesterFilter, "historyRequester"], [historyStatusFilter, "historyStatus"], [historyDateFrom, "historyDateFrom"], [historyDateTo, "historyDateTo"]].forEach(([input, key]) => input?.addEventListener(input === historySearchInput ? "input" : "change", () => { updateQueryState({ [key]: input.value.trim() }); renderHistory(); }));
   form.addEventListener("submit", saveTask);
   transferForm?.addEventListener("submit", submitTransfer);
