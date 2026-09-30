@@ -7,7 +7,7 @@ import { readTrackerVehicleList } from "./tracker-live.js";
 import { TrackerHistoryStore } from "./tracker-history-store.js";
 import { deduplicateTrackerRecords, TrackerStatusStore } from "./tracker-status-store.js";
 import { cleanupTrackerEmailReports, syncLatestTrackerEmailReport, TrackerEmailReportStore } from "./tracker-email-report.js";
-import { hasRetryableTrackerMileageResults, syncStoredTrackerEmailMileage, TrackerMileageSyncStore } from "./tracker-mileage-sync.js";
+import { hasRetryableTrackerMileageResults, syncStoredTrackerEmailMileage, syncTrackerLiveMileage, TrackerMileageSyncStore } from "./tracker-mileage-sync.js";
 import { LarkClient } from "./lark.js";
 
 const statusStore = new TrackerStatusStore();
@@ -287,6 +287,12 @@ export async function syncTrackerReportOnce(completedRefreshRequestId?: string):
     const historyRecords = historyStore.appendSnapshots(records);
     statusStore.writeSuccess({ ...parsed, records, source, completedRefreshRequestId });
     console.log("Tracker vehicle data synchronized", { source, records: records.length, historyRecords, reportCreatedAt: parsed.reportCreatedAt });
+    try {
+      const mileage = await syncTrackerLiveMileage(lark, records);
+      console.log("Tracker vehicle mileage synchronized", mileage);
+    } catch (error) {
+      console.warn("Tracker vehicle mileage synchronization failed", { error: message(error) });
+    }
     return records.length;
   } catch (error) {
     const detail = message(error);

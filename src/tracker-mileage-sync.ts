@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "./config.js";
 import { LarkClient } from "./lark.js";
-import { normalizeTrackerIdentifier } from "./tracker-status-store.js";
+import { normalizeTrackerIdentifier, type TrackerVehicleSnapshot } from "./tracker-status-store.js";
 import { TrackerEmailReportStore } from "./tracker-email-report.js";
 import type { ParsedTrackerCsvReport, TrackerCsvMileageRecord } from "./tracker-csv-report.js";
 import type { VehicleProfile, VehicleSyncResult } from "./types.js";
@@ -178,6 +178,36 @@ function resultAudit(record: TrackerCsvMileageRecord, vehicle: VehicleProfile | 
     currentMileage: current?.mileage ?? null,
     message: result.message
   };
+}
+
+export async function syncTrackerLiveMileage(lark: LarkClient, records: TrackerVehicleSnapshot[]): Promise<{ checked: number; updated: number; failed: number }> {
+  if (!config.trackerMileageSyncEnabled) return { checked: 0, updated: 0, failed: 0 };
+  const vehicles = await lark.listVehicles();
+  let checked = 0;
+  let updated = 0;
+  let failed = 0;
+  for (const record of records) {
+    if (record.odometer === null || !Number.isFinite(record.odometer) || record.odometer < 0) continue;
+    checked += 1;
+    const match = matchVehicle(record.registration, vehicles);
+    if (match.status !== "matched" || !match.vehicle || !match.vehicle.currentMileageField) continue;
+    const trackerVin = normalizeTrackerIdentifier(record.vin);
+    const vehicleVin = normalizeTrackerIdentifier(match.vehicle.vehicleIdentificationNumber);
+    if (trackerVin && vehicleVin && trackerVin !== vehicleVin) {
+      console.warn("Tracker live mileage VIN mismatch", { registration: record.registration, plate: match.vehicle.plate });
+      continue;
+    }
+    if (match.vehicle.mileage !== null && record.odometer <= match.vehicle.mileage) continue;
+    try {
+      const result = await lark.syncTrackerReportMileage(match.vehicle, record.odometer);
+      if (result.status === "updated") updated += 1;
+      if (result.status === "updated" && result.vehicle) match.vehicle.mileage = result.vehicle.mileage;
+    } catch (error) {
+      failed += 1;
+      console.warn("Tracker live mileage update failed", { registration: record.registration, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { checked, updated, failed };
 }
 
 export async function syncTrackerMileageReport(

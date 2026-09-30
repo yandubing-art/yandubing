@@ -15,7 +15,7 @@ const vehicle = {
   year: "", yearField: "",
   registeringAuthority: "", registeringAuthorityField: "",
   trackerRegistration: "", trackerRegistrationField: "",
-  insurance: "", insuranceField: "",
+  insurance: "", insuranceField: "Insurance",
   mileage: null, nextMaintenanceMileage: null, nextMaintenanceDate: "",
   logBookAttachments: [], logBookField: "log book",
   dateFieldNames: [], photoFieldConfigured: false
@@ -38,7 +38,8 @@ function clientForSave() {
     { name: "Vehicle Brand", type: 3, options: ["Toyota | 丰田", "Ford | 福特"] },
     { name: "Vehicle Type", type: 3, options: ["HATCH BACK"] },
     { name: "Vehicle Status", type: 3, options: ["In Use"] },
-    { name: "Department", type: 3, options: [ownerOption] }
+    { name: "Department", type: 3, options: [ownerOption] },
+    { name: "Insurance", type: 3, options: ["YES", "NO"] }
   ];
   return client;
 }
@@ -66,7 +67,19 @@ test("a changed select writes the exact option stored in the target table", asyn
     return { record_id: recordId, fields };
   };
   await client.updateVehicleProfile(vehicle.tableId, vehicle.recordId, { ...input, brand: "Ford | 福特" });
-  assert.deepEqual(written[vehicle.brandField], ["Ford | 福特"]);
+  assert.equal(written[vehicle.brandField], "Ford | 福特");
+  assert.equal(written.Department, undefined);
+});
+
+test("insurance status uses the raw API single-select string format", async () => {
+  const client = clientForSave();
+  let written;
+  client.updateRecord = async (recordId, fields) => {
+    written = fields;
+    return { record_id: recordId, fields: { ...fields, Insurance: [fields.Insurance] } };
+  };
+  await client.updateVehicleProfile(vehicle.tableId, vehicle.recordId, { ...input, insurance: "YES" });
+  assert.equal(written.Insurance, "YES");
   assert.equal(written.Department, undefined);
 });
 

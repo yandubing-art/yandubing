@@ -23,7 +23,37 @@ type VisibleTrackerVehicle = {
   status: string;
   location: string;
   timestampLabel: string;
+  vin?: string;
+  product?: string;
+  odometer?: number | null;
 };
+
+export function parseTrackerOdometer(value: string): number | null {
+  const match = /([\d\s,\.]+)\s*(?:km|公里)/i.exec(value.replace(/\u00a0/g, " "));
+  if (!match) return null;
+  const odometer = Number(match[1].replace(/[\s,]/g, ""));
+  return Number.isFinite(odometer) && odometer >= 0 ? odometer : null;
+}
+
+async function readVehicleDetails(page: Page, index: number): Promise<Pick<VisibleTrackerVehicle, "vin" | "product" | "odometer">> {
+  const item = page.locator("vehicleitem").nth(index);
+  const toggle = item.locator(".DesktopExpandIcon imagebutton > div");
+  await toggle.evaluate((element) => (element as HTMLElement).click());
+  try {
+    const details = item.locator(".detailsContent").first();
+    await details.waitFor({ state: "attached", timeout: 8_000 });
+    await details.locator(".odometerClass").first().waitFor({ state: "attached", timeout: 2_000 }).catch(() => undefined);
+    const data = await details.evaluate((element) => ({
+      lines: [...element.querySelectorAll(".modelClass")].map((node) => node.textContent?.trim() || ""),
+      odometer: element.querySelector(".odometerClass")?.textContent?.trim() || "",
+      product: element.querySelector(".productClass")?.textContent?.trim() || ""
+    }));
+    const vin = data.lines.map((line) => /^VIN\s*:\s*(\S+)/i.exec(line)?.[1] || "").find(Boolean) || "";
+    return { vin, product: data.product, odometer: parseTrackerOdometer(data.odometer) };
+  } finally {
+    await toggle.evaluate((element) => (element as HTMLElement).click()).catch(() => undefined);
+  }
+}
 
 export function parseTrackerVisibleTimestamp(value: string): string | null {
   const match = /(?:^|,\s*)(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\s+(\d{2}):(\d{2})\s*$/.exec(value.trim());
@@ -61,6 +91,15 @@ export async function readTrackerVehicleList(
     };
   }));
 
+  for (let index = 0; index < visible.length; index += 1) {
+    if (!visible[index].registration) continue;
+    try {
+      Object.assign(visible[index], await readVehicleDetails(page, index));
+    } catch (error) {
+      console.warn("Tracker vehicle details unavailable", { registration: visible[index].registration, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
   const previousByRegistration = new Map<string, TrackerVehicleSnapshot>();
   for (const record of previousRecords) {
     const key = normalizeTrackerIdentifier(record.registration);
@@ -76,10 +115,10 @@ export async function readTrackerVehicleList(
     return [{
       registration: item.registration,
       alias: preferredAlias(previous, item.alias),
-      vin: previous?.vin || "",
-      product: previous?.product || "",
+      vin: item.vin || previous?.vin || "",
+      product: item.product || previous?.product || "",
       unitSerialNumber: previous?.unitSerialNumber || "",
-      odometer: previous?.odometer ?? null,
+      odometer: item.odometer ?? previous?.odometer ?? null,
       location: item.location,
       trackerTimestamp,
       status: item.status

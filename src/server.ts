@@ -73,7 +73,15 @@ function vehiclesWithLocalAssets<T extends { tableId: string; recordId: string; 
 
 function vehiclesWithMileageSource(vehicles: VehicleProfile[]): VehicleProfile[] {
   const state = trackerMileageSync.read();
+  const live = trackerStatus.read();
   return vehicles.map((vehicle) => {
+    const liveMatch = matchTrackerVehicle(live.records, vehicle);
+    const liveMileage = liveMatch.status === "matched" ? liveMatch.snapshot?.odometer : null;
+    const liveVin = normalizeTrackerIdentifier(liveMatch.snapshot?.vin);
+    const vehicleVin = normalizeTrackerIdentifier(vehicle.vehicleIdentificationNumber);
+    if (liveMileage !== null && liveMileage !== undefined && vehicle.mileage === liveMileage && (!liveVin || !vehicleVin || liveVin === vehicleVin)) {
+      return { ...vehicle, mileageSource: "tracker_live", mileageSourceUpdatedAt: live.lastSuccessAt || undefined };
+    }
     const audit = state.results.find((item) => item.tableId === vehicle.tableId && item.recordId === vehicle.recordId && (item.status === "updated" || item.status === "unchanged"));
     if (!audit || audit.reportMileage === null || vehicle.mileage !== audit.reportMileage) return vehicle;
     return {
@@ -1109,7 +1117,7 @@ app.get("/api/options", requireAnyPermission("mobile_dispatch", "desktop_console
         return [];
       })
     ]);
-    res.json({ ok: true, users, vehicles: vehiclesWithLocalAssets(visibleVehicles(principal, vehicles)), stores, warnings });
+    res.json({ ok: true, users, vehicles: vehiclesWithLocalAssets(vehiclesWithMileageSource(visibleVehicles(principal, vehicles))), stores, warnings });
   } catch (error) {
     next(error);
   }
@@ -1134,7 +1142,7 @@ app.get("/api/options/vehicles", requireAnyPermission("mobile_dispatch", "deskto
     // photo reconciliation is independent work and must not hold up that
     // response or the first screen.
     const visible = visibleVehicles(principal, vehicles);
-    res.json({ ok: true, vehicles: req.query.compact === "1" ? compactDispatchVehicles(visible) : vehiclesWithLocalAssets(visible) });
+    res.json({ ok: true, vehicles: req.query.compact === "1" ? compactDispatchVehicles(visible) : vehiclesWithLocalAssets(vehiclesWithMileageSource(visible)) });
     void syncBackendVehiclePhotos(vehicles).then((result) => {
       if (result.synced || result.failed) console.info("Background vehicle photo sync finished", result);
     }).catch((error) => {

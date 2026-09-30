@@ -1246,7 +1246,7 @@ export class LarkClient {
       if (!definition) return value;
       const exactOption = definition.options.find((option) => lookupKey(option) === lookupKey(value));
       if (!exactOption) throw new Error(`${fieldName} 的选项“${value}”不在当前车辆表中，请重新选择`);
-      return [exactOption];
+      return definition.type === 4 || definition.multiple ? [exactOption] : exactOption;
     };
     const plate = input.plate.trim();
     const brand = input.brand.trim();
@@ -1282,7 +1282,7 @@ export class LarkClient {
     writeTextField(vehicle.vehicleIdentificationNumberField, input.vehicleIdentificationNumber.trim());
     const trackerRegistration = input.trackerRegistration.trim();
     if (vehicle.trackerRegistrationField && trackerRegistration !== vehicle.trackerRegistration) {
-      fields[vehicle.trackerRegistrationField] = trackerRegistration ? selectCellValue(vehicle.trackerRegistrationField, trackerRegistration) : selectFields.has(lookupKey(vehicle.trackerRegistrationField)) ? [] : "";
+      fields[vehicle.trackerRegistrationField] = trackerRegistration ? selectCellValue(vehicle.trackerRegistrationField, trackerRegistration) : selectFields.has(lookupKey(vehicle.trackerRegistrationField)) ? null : "";
     }
     writeTextField(vehicle.certificateExpiryField, input.certificateExpiry.trim());
     writeTextField(vehicle.policyNumberField, input.policyNumber.trim());
@@ -1383,7 +1383,8 @@ export class LarkClient {
     const vehicle = (await this.listVehicles()).find((item) => item.tableId === tableId && item.recordId === recordId);
     if (!vehicle) throw new Error("未找到要标记为已售的车辆档案");
     if (!vehicle.statusField) throw new Error("当前车辆档案表未配置车辆状态字段");
-    const statusValue = vehicle.selectFieldNames.includes(vehicle.statusField) ? ["Sold"] : "Sold";
+    const statusField = (await this.listVehicleFieldsWithOptions(tableId)).find((field) => lookupKey(field.name) === lookupKey(vehicle.statusField));
+    const statusValue = statusField?.type === 4 || statusField?.multiple ? ["Sold"] : "Sold";
     await this.updateRecord(recordId, { [vehicle.statusField]: statusValue }, tableId, !config.previewMode);
     this.invalidateVehiclesCache();
     return { ...vehicle, status: "Sold", dispatchEligible: false };
@@ -1464,7 +1465,7 @@ export class LarkClient {
       if (fieldTypeName(field.type) === "select") {
         const option = field.options.find((candidate) => lookupKey(candidate) === lookupKey(String(value)));
         if (!option) throw new Error(`${field.name} 的选项“${value}”不在当前车辆表中，请重新选择`);
-        fields[field.name] = [option];
+        fields[field.name] = field.type === 4 || field.multiple ? [option] : option;
       } else {
         fields[field.name] = value;
       }

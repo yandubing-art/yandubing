@@ -5,7 +5,39 @@ import path from "node:path";
 import test from "node:test";
 
 process.env.TRACKER_MILEAGE_SYNC_ENABLED = "true";
-const { syncTrackerMileageReport, TrackerMileageSyncStore } = await import("../dist/tracker-mileage-sync.js");
+const { syncTrackerLiveMileage, syncTrackerMileageReport, TrackerMileageSyncStore } = await import("../dist/tracker-mileage-sync.js");
+const { parseTrackerOdometer } = await import("../dist/tracker-live.js");
+
+test("reads the total odometer shown on a Tracker vehicle detail card", () => {
+  assert.equal(parseTrackerOdometer("5 691 km"), 5691);
+  assert.equal(parseTrackerOdometer("5,691 km"), 5691);
+  assert.equal(parseTrackerOdometer("Private - 893 km"), 893);
+  assert.equal(parseTrackerOdometer(""), null);
+});
+
+test("automatically matches live Tracker mileage while protecting newer vehicle mileage and VIN", async () => {
+  const vehicles = [
+    { tableId: "company", recordId: "starlet", plate: "KZ18GMGP", trackerRegistration: "KZ18GMGP", vehicleIdentificationNumber: "JTDJWCA3S00252381", currentMileageField: "Maintenance mileage", mileage: null },
+    { tableId: "company", recordId: "newer", plate: "NEWER", trackerRegistration: "NEWER", vehicleIdentificationNumber: "", currentMileageField: "Maintenance mileage", mileage: 7000 },
+    { tableId: "company", recordId: "wrong-vin", plate: "WRONG", trackerRegistration: "WRONG", vehicleIdentificationNumber: "EXPECTED", currentMileageField: "Maintenance mileage", mileage: null }
+  ];
+  const writes = [];
+  const lark = {
+    listVehicles: async () => vehicles,
+    syncTrackerReportMileage: async (vehicle, mileage) => {
+      writes.push([vehicle.recordId, mileage]);
+      return { status: "updated", vehicle: { ...vehicle, mileage } };
+    }
+  };
+  const records = [
+    { registration: "KZ18GMGP", vin: "JTDJWCA3S00252381", odometer: 5691 },
+    { registration: "NEWER", vin: "", odometer: 6000 },
+    { registration: "WRONG", vin: "DIFFERENT", odometer: 9000 }
+  ];
+  const result = await syncTrackerLiveMileage(lark, records);
+  assert.deepEqual(result, { checked: 3, updated: 1, failed: 0 });
+  assert.deepEqual(writes, [["starlet", 5691]]);
+});
 
 test("retries only failed rows from the same CSV and preserves successful audit rows", async (context) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "tracker-mileage-retry-"));

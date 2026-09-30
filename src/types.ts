@@ -111,7 +111,7 @@ export type VehicleProfile = {
   dispatchEligible: boolean;
   photoUrl: string;
   mileage: number | null;
-  mileageSource?: "tracker_report";
+  mileageSource?: "tracker_report" | "tracker_live";
   mileageSourceUpdatedAt?: string;
   mileageSourceReportEnd?: string;
   nextMaintenanceMileage: number | null;
