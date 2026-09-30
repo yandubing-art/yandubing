@@ -293,11 +293,14 @@ select option { background:#111625; color:var(--ink); }
 .vehicle-specs strong,.vehicle-maintenance-row strong { color:#e8edf8; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .mileage-cell { position:relative; }
 .mileage-value-line { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px; min-width:0; }
-.vehicle-specs .mileage-value-line { flex-direction:row; justify-content:flex-start; padding:0; border:0; background:transparent; }
+.vehicle-specs .mileage-value-line { flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:2px; padding:0; border:0; background:transparent; }
 .mileage-source { display:inline; font-size:9px; font-weight:800; line-height:1.25; letter-spacing:.01em; white-space:nowrap; }
 .tracker-mileage-source { color:#b47b00; }
 .tracker-mileage-value { color:#b47b00 !important; }
 html[data-theme="night"] .tracker-mileage-source,html[data-theme="night"] .tracker-mileage-value { color:#f4d35e !important; }
+.vehicle-specs .mileage-value-line strong { font-size:14px; line-height:1.2; font-variant-numeric:tabular-nums; }
+.vehicle-specs .mileage-source { display:block; color:#53647e; font-size:11px; font-weight:600; line-height:1.25; }
+html[data-theme="night"] .vehicle-specs .mileage-source { color:#b6c2d9 !important; }
 .vehicle-maintenance-row { flex-direction:row; justify-content:space-between; align-items:center; margin-top:8px; }
 .vehicle-maintenance-row strong { color:#aee3ff; }
 .vehicle-completeness { max-height:34px; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
