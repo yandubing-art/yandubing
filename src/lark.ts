@@ -58,6 +58,16 @@ type FieldListData = {
   page_token?: string;
 };
 
+type VehicleSelectDefinition = { name: string; type: number | string; multiple: boolean; options: string[] };
+
+// Raw Base record writes use a string for single select and an array for multi select.
+// The Base read API may return both as arrays, so never reuse the read shape here.
+function vehicleSelectCellValue(field: VehicleSelectDefinition, value: string): string | string[] {
+  const option = field.options.find((candidate) => lookupKey(candidate) === lookupKey(value));
+  if (!option) throw new Error(`${field.name} 的选项“${value}”不在当前车辆表中，请重新选择`);
+  return field.type === 4 || field.multiple ? [option] : option;
+}
+
 export type VehicleFieldOptions = {
   brand: string[];
   model: string[];
@@ -1244,9 +1254,7 @@ export class LarkClient {
     const selectCellValue = (fieldName: string, value: string): string[] | string => {
       const definition = selectFields.get(lookupKey(fieldName));
       if (!definition) return value;
-      const exactOption = definition.options.find((option) => lookupKey(option) === lookupKey(value));
-      if (!exactOption) throw new Error(`${fieldName} 的选项“${value}”不在当前车辆表中，请重新选择`);
-      return definition.type === 4 || definition.multiple ? [exactOption] : exactOption;
+      return vehicleSelectCellValue(definition, value);
     };
     const plate = input.plate.trim();
     const brand = input.brand.trim();
@@ -1384,7 +1392,7 @@ export class LarkClient {
     if (!vehicle) throw new Error("未找到要标记为已售的车辆档案");
     if (!vehicle.statusField) throw new Error("当前车辆档案表未配置车辆状态字段");
     const statusField = (await this.listVehicleFieldsWithOptions(tableId)).find((field) => lookupKey(field.name) === lookupKey(vehicle.statusField));
-    const statusValue = statusField?.type === 4 || statusField?.multiple ? ["Sold"] : "Sold";
+    const statusValue = statusField && fieldTypeName(statusField.type) === "select" ? vehicleSelectCellValue(statusField, "Sold") : "Sold";
     await this.updateRecord(recordId, { [vehicle.statusField]: statusValue }, tableId, !config.previewMode);
     this.invalidateVehiclesCache();
     return { ...vehicle, status: "Sold", dispatchEligible: false };
@@ -1463,9 +1471,7 @@ export class LarkClient {
       const field = matchingField(names);
       if (!field) return;
       if (fieldTypeName(field.type) === "select") {
-        const option = field.options.find((candidate) => lookupKey(candidate) === lookupKey(String(value)));
-        if (!option) throw new Error(`${field.name} 的选项“${value}”不在当前车辆表中，请重新选择`);
-        fields[field.name] = field.type === 4 || field.multiple ? [option] : option;
+        fields[field.name] = vehicleSelectCellValue(field, String(value));
       } else {
         fields[field.name] = value;
       }
