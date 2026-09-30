@@ -1482,6 +1482,14 @@
   }
 
   function vehicleEditorChoices(key, property, current = "") {
+    const tableId = state.creatingVehicle ? $("vehicleTableInput")?.value : state.editingVehicle?.tableId;
+    const table = state.vehicleFieldDefinitions?.tables?.find((item) => item.tableId === tableId);
+    const field = table?.fields?.find((item) => item.key === key);
+    if (field?.type === "select") {
+      const values = (field.options || []).filter((value) => cleanDisplay(value));
+      if (!state.creatingVehicle && current && !values.some((value) => cleanDisplay(value) === cleanDisplay(current))) values.unshift(current);
+      return values;
+    }
     const values = [];
     const seen = new Set();
     const add = (value) => { const clean = cleanDisplay(value); if (clean && !seen.has(clean)) { seen.add(clean); values.push(clean); } };
@@ -1495,10 +1503,16 @@
     const select = $(id);
     if (!select) return;
     const cleanCurrent = cleanDisplay(current);
-    const normalized = [...new Set(values.map(cleanDisplay).filter(Boolean))];
-    if (cleanCurrent && !normalized.includes(cleanCurrent)) normalized.unshift(cleanCurrent);
-    select.innerHTML = `<option value="">${t(placeholder)}</option>` + normalized.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");
-    select.value = cleanCurrent;
+    const seen = new Set();
+    const options = values.filter((value) => {
+      const label = cleanDisplay(value);
+      if (!label || seen.has(label)) return false;
+      seen.add(label);
+      return true;
+    });
+    if (cleanCurrent && !seen.has(cleanCurrent)) options.unshift(current);
+    select.innerHTML = `<option value="">${t(placeholder)}</option>` + options.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(cleanDisplay(value))}</option>`).join("");
+    select.value = options.find((value) => cleanDisplay(value) === cleanCurrent) || "";
   }
 
   function renderVehicleTrackerOptions() {
@@ -1540,13 +1554,13 @@
   function renderVehicleEditorOptions() {
     const vehicle = state.editingVehicle;
     const current = {
-      brand: $("vehicleBrandInput")?.value || "",
-      model: $("vehicleModelInput")?.value || "",
-      type: $("vehicleTypeInput")?.value || "",
-      status: $("vehicleStatusInput")?.value || "",
-      owner: $("vehicleOwnerInput")?.value || "",
-      registeringAuthority: $("vehicleRegisteringAuthorityInput")?.value || "",
-      insurance: $("vehicleInsuranceInput")?.value || ""
+      brand: $("vehicleBrandInput")?.value || vehicle?.brand || "",
+      model: $("vehicleModelInput")?.value || vehicle?.model || "",
+      type: $("vehicleTypeInput")?.value || vehicle?.vehicleType || "",
+      status: $("vehicleStatusInput")?.value || vehicle?.status || "",
+      owner: $("vehicleOwnerInput")?.value || vehicle?.owner || "",
+      registeringAuthority: $("vehicleRegisteringAuthorityInput")?.value || vehicle?.registeringAuthority || "",
+      insurance: $("vehicleInsuranceInput")?.value || vehicle?.insurance || ""
     };
     setVehicleEditorSelect("vehicleBrandInput", vehicleEditorChoices("brand", "brand", current.brand), "请选择车辆品牌", current.brand);
     setVehicleEditorSelect("vehicleModelInput", vehicleEditorChoices("model", "model", current.model), "请选择车型", current.model);
@@ -1555,11 +1569,7 @@
     setVehicleEditorSelect("vehicleRegisteringAuthorityInput", vehicleEditorChoices("registeringAuthority", "registeringAuthority", current.registeringAuthority), "请选择注册地点", current.registeringAuthority);
     const statusValues = vehicleEditorChoices("status", "status", current.status);
     if (state.creatingVehicle && !statusValues.includes("Sold")) statusValues.push("Sold");
-    const statusSelect = $("vehicleStatusInput");
-    if (statusSelect) {
-      statusSelect.innerHTML = `<option value="">${t("未设置")}</option>` + statusValues.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");
-      statusSelect.value = current.status;
-    }
+    setVehicleEditorSelect("vehicleStatusInput", statusValues, "未设置", current.status || (state.creatingVehicle ? "Sold" : ""));
     const insuranceSelect = $("vehicleInsuranceInput");
     if (insuranceSelect) {
       const insuranceValues = vehicleEditorChoices("insurance", "insurance", current.insurance)
@@ -2945,6 +2955,7 @@
     if (save) void saveVehicleOption(save.dataset.tableId, save.dataset.fieldId);
   });
   $("editVehicleButton").addEventListener("click", () => { if (state.editingVehicle) openVehicleEditor(state.editingVehicle.tableId, state.editingVehicle.recordId); });
+  $("vehicleTableInput").addEventListener("change", renderVehicleEditorOptions);
   $("markSoldButton").addEventListener("click", markVehicleSold);
   $("deleteVehicleButton").addEventListener("click", deleteVehicle);
   $("deleteVehicleDetailButton").addEventListener("click", deleteVehicle);

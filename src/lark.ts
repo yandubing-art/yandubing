@@ -812,7 +812,7 @@ export class LarkClient {
       );
       for (const field of data.items || []) {
         if (!field.field_name) continue;
-        const rawType = typeof field.type === "number" ? field.type : field.type === "select" ? 3 : 1;
+        const rawType = typeof field.type === "number" ? field.type : fieldTypeName(field.type) === "select" ? 3 : 1;
         fields.push({ name: field.field_name, type: rawType });
       }
       pageToken = data.has_more ? data.page_token || "" : "";
@@ -1123,7 +1123,7 @@ export class LarkClient {
           fnbFleetCardField: fnbFleetCardField?.name || "",
           fleetCardPhotoUrl: fleetCardPhotos[0]?.url || "",
           fleetCardPhotoField: fleetCardPhotoField?.name || "",
-          selectFieldNames: [brandField, typeField, statusField, ownerField, yearField, registeringAuthorityField, insuranceField, resolvedTrackerField].filter((field): field is { name: string; value: unknown } => Boolean(field && Array.isArray(field.value))).map((field) => field.name),
+          selectFieldNames: tableFields[tableIndex].filter((field) => field.type === 3 || field.type === 4).map((field) => field.name),
           dispatchEligible: dispatchEligibility(plate, model, status),
           photoUrl: photos[0]?.url || "",
           photoFileToken: photos[0]?.fileToken,
@@ -1239,6 +1239,15 @@ export class LarkClient {
   async updateVehicleProfile(tableId: string, recordId: string, input: VehicleProfileInput): Promise<VehicleProfile> {
     const vehicle = (await this.listVehicles()).find((item) => item.tableId === tableId && item.recordId === recordId);
     if (!vehicle) throw new Error("未找到要编辑的车辆档案");
+    const fieldDefinitions = await this.listVehicleFieldsWithOptions(tableId);
+    const selectFields = new Map(fieldDefinitions.filter((field) => fieldTypeName(field.type) === "select").map((field) => [lookupKey(field.name), field]));
+    const selectCellValue = (fieldName: string, value: string): string[] | string => {
+      const definition = selectFields.get(lookupKey(fieldName));
+      if (!definition) return value;
+      const exactOption = definition.options.find((option) => lookupKey(option) === lookupKey(value));
+      if (!exactOption) throw new Error(`${fieldName} 的选项“${value}”不在当前车辆表中，请重新选择`);
+      return [exactOption];
+    };
     const plate = input.plate.trim();
     const brand = input.brand.trim();
     const model = input.model.trim();
@@ -1251,16 +1260,17 @@ export class LarkClient {
       [vehicle.plateField]: plate,
       [vehicle.modelField]: model
     };
-    const writeLikeCurrent = (fieldName: string, value: string): void => {
+    const writeLikeCurrent = (fieldName: string, value: string, currentValue: string): void => {
       if (!fieldName || !value) return;
-      fields[fieldName] = vehicle.selectFieldNames.includes(fieldName) ? [value] : value;
+      if (selectFields.has(lookupKey(fieldName)) ? lookupKey(value) === lookupKey(currentValue) : value === currentValue) return;
+      fields[fieldName] = selectCellValue(fieldName, value);
     };
-    writeLikeCurrent(vehicle.brandField, brand);
-    writeLikeCurrent(vehicle.typeField, vehicleType);
-    writeLikeCurrent(vehicle.statusField, status);
-    writeLikeCurrent(vehicle.ownerField, owner);
-    writeLikeCurrent(vehicle.yearField, year);
-    writeLikeCurrent(vehicle.registeringAuthorityField, input.registeringAuthority.trim());
+    writeLikeCurrent(vehicle.brandField, brand, vehicle.brand);
+    writeLikeCurrent(vehicle.typeField, vehicleType, vehicle.vehicleType);
+    writeLikeCurrent(vehicle.statusField, status, vehicle.status);
+    writeLikeCurrent(vehicle.ownerField, owner, vehicle.owner);
+    writeLikeCurrent(vehicle.yearField, year, vehicle.year);
+    writeLikeCurrent(vehicle.registeringAuthorityField, input.registeringAuthority.trim(), vehicle.registeringAuthority);
     const writeTextField = (fieldName: string, value: string): void => {
       if (!fieldName || !value) return;
       fields[fieldName] = vehicle.dateFieldNames.includes(fieldName) ? dateTimeCellValue(value) : value;
@@ -1272,16 +1282,14 @@ export class LarkClient {
     writeTextField(vehicle.vehicleIdentificationNumberField, input.vehicleIdentificationNumber.trim());
     const trackerRegistration = input.trackerRegistration.trim();
     if (vehicle.trackerRegistrationField && trackerRegistration !== vehicle.trackerRegistration) {
-      fields[vehicle.trackerRegistrationField] = vehicle.selectFieldNames.includes(vehicle.trackerRegistrationField)
-        ? (trackerRegistration ? [trackerRegistration] : [])
-        : trackerRegistration;
+      fields[vehicle.trackerRegistrationField] = trackerRegistration ? selectCellValue(vehicle.trackerRegistrationField, trackerRegistration) : selectFields.has(lookupKey(vehicle.trackerRegistrationField)) ? [] : "";
     }
     writeTextField(vehicle.certificateExpiryField, input.certificateExpiry.trim());
     writeTextField(vehicle.policyNumberField, input.policyNumber.trim());
     const insurance = input.insurance.trim();
     const normalizedInsurance = /^yes$/i.test(insurance) ? "YES" : /^no$/i.test(insurance) ? "NO" : insurance;
-    if (vehicle.insuranceField && normalizedInsurance) {
-      fields[vehicle.insuranceField] = vehicle.selectFieldNames.includes(vehicle.insuranceField) ? [normalizedInsurance] : normalizedInsurance;
+    if (vehicle.insuranceField && normalizedInsurance && lookupKey(normalizedInsurance) !== lookupKey(vehicle.insurance)) {
+      fields[vehicle.insuranceField] = selectCellValue(vehicle.insuranceField, normalizedInsurance);
     }
     writeTextField(vehicle.fnbFleetCardField, input.fnbFleetCard.trim());
     const mileage = input.mileage ?? vehicle.mileage;
@@ -1440,9 +1448,9 @@ export class LarkClient {
       return vehicle;
     }
 
-    const definitions = await this.listVehicleFields(tableId);
+    const definitions = await this.listVehicleFieldsWithOptions(tableId);
     const normalized = new Map(definitions.map((item) => [lookupKey(item.name), item]));
-    const matchingField = (names: readonly string[]): { name: string; type: number } | undefined => {
+    const matchingField = (names: readonly string[]): (typeof definitions)[number] | undefined => {
       for (const candidate of names) {
         const definition = normalized.get(lookupKey(candidate));
         if (definition) return definition;
@@ -1453,7 +1461,13 @@ export class LarkClient {
       if (value === null || value === "") return;
       const field = matchingField(names);
       if (!field) return;
-      fields[field.name] = field.type === 3 || field.type === 4 ? [value] : value;
+      if (fieldTypeName(field.type) === "select") {
+        const option = field.options.find((candidate) => lookupKey(candidate) === lookupKey(String(value)));
+        if (!option) throw new Error(`${field.name} 的选项“${value}”不在当前车辆表中，请重新选择`);
+        fields[field.name] = [option];
+      } else {
+        fields[field.name] = value;
+      }
     };
     write(config.vehicleFields.plate, plate);
     write(config.vehicleFields.model, model);
